@@ -10,7 +10,7 @@ Monorepo pnpm + turbo, Biome, TypeScript strict :
 - `apps/web` : Vite + React + TanStack Router/Query + Tailwind + shadcn/ui ;
 - `apps/api` : Fastify + Zod + Drizzle, SDK Anthropic (`claude-haiku-5-5`, constante `AI_MODEL` dans `apps/api/src/ai.ts`) ;
 - `packages/db` : schéma Drizzle et migrations (Postgres) ;
-- `forms/` : les questionnaires, un fichier YAML chacun.
+- `forms/` : questionnaires d'exemple en YAML, importés dans une base neuve au démarrage.
 
 ## Lancer en local
 
@@ -22,7 +22,26 @@ pnpm db:migrate
 pnpm dev                    # API sur :3400, front sur http://localhost:5190
 ```
 
-Ensuite, ouvrir http://localhost:5190/admin, choisir un questionnaire, créer un répondant,
+## Créer un questionnaire
+
+Les questionnaires vivent en base. Deux sortes : **réutilisable** (plusieurs personnes, un
+lien chacune) ou **ponctuel** (`reusable: false`, écrit pour une seule personne).
+
+Le plus simple : demander à Claude (skill `questionnaire` des dotfiles), par exemple
+« fais-moi un questionnaire pour Dupont sur son projet de cuisine ». Il rédige les questions,
+les publie et renvoie le lien à transmettre. Sous le capot, deux appels authentifiés par
+`ADMIN_API_TOKEN` :
+
+```sh
+curl -X PUT -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -d '{"reusable": false, "definition": { …format ci-dessous, en JSON ou en texte YAML… }}' \
+  https://ask.tnemelc.fr/api/admin/forms/projet-cuisine-dupont
+curl -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -d '{"name": "M. Dupont"}' https://ask.tnemelc.fr/api/admin/forms/projet-cuisine-dupont/respondents
+# → { "link": "https://ask.tnemelc.fr/r/…", … }
+```
+
+Depuis l'admin, on peut aussi ouvrir http://localhost:5190/admin, choisir un questionnaire, créer un répondant,
 puis « Copier le lien » ou « Préparer le mail ». Ce dernier ouvre un brouillon dans votre
 messagerie (`mailto:`) : l'application n'envoie jamais de mail elle-même.
 
@@ -34,10 +53,10 @@ En production sur https://ask.tnemelc.fr, via Dokploy (`admn.tnemelc.fr`, projet
 `questionnaire`) : une seule image (`Dockerfile` racine, l'API sert aussi le front),
 Postgres 18 à côté, migrations au démarrage. Chaque push sur `main` qui touche `apps/`,
 `packages/`, `forms/` ou le `Dockerfile` redéploie. Ajouter un questionnaire en prod, c'est
-donc committer son YAML dans `forms/`.
+plus besoin de pousser quoi que ce soit : voir « Créer un questionnaire ».
 
 Les variables de prod (`DATABASE_URL`, `ANTHROPIC_API_KEY`, `ADMIN_PASSWORD`,
-`NODE_ENV=production`) sont dans Dokploy ; copie des secrets dans le coffre iCloud
+`ADMIN_API_TOKEN`, `PUBLIC_URL`, `NODE_ENV=production`) sont dans Dokploy ; copie des secrets dans le coffre iCloud
 (`Secrets/repos/questionnaire/.env.production`).
 
 ## Variables d'environnement (`.env` à la racine, jamais versionné)
@@ -47,13 +66,16 @@ Les variables de prod (`DATABASE_URL`, `ANTHROPIC_API_KEY`, `ADMIN_PASSWORD`,
 | `DATABASE_URL` | Connexion Postgres (celle du `docker-compose.yml` par défaut). |
 | `ANTHROPIC_API_KEY` | Clé de l'API Anthropic. |
 | `ADMIN_PASSWORD` | Mot de passe de `/admin` (8 caractères minimum). Le changer déconnecte toutes les sessions. |
+| `ADMIN_API_TOKEN` | Jeton (32 caractères min.) pour l'API admin en `Bearer`, utilisée par le skill. Absent : API admin par cookie seulement. |
+| `PUBLIC_URL` | Adresse publique (ex. `https://ask.tnemelc.fr`) pour les liens renvoyés ; sinon déduite de la requête. |
 | `API_PORT`, `WEB_PORT` | Ports de dev (3400 et 5190 par défaut). Le front relaie `/api` vers l'API. |
 
 ## Format des questionnaires
 
-Un fichier `forms/<id>.yaml` par questionnaire, l'`<id>` étant le nom du fichier. Le
-fichier est validé au démarrage de l'API, et un YAML invalide l'empêche de démarrer avec
-un message qui pointe l'erreur. Exemple complet : `forms/cadrage-site-web.yaml`.
+Même format en JSON (API) ou en YAML (`forms/<id>.yaml`, importé au démarrage s'il n'est
+pas déjà en base). L'identifiant : minuscules, chiffres et tirets. Toute définition est
+validée, avec un message qui pointe chaque erreur. Exemple complet :
+`forms/cadrage-site-web.yaml`.
 
 ```yaml
 title: Titre affiché au répondant
@@ -72,7 +94,15 @@ sections:
         options: [Présenter mon activité, Vendre en ligne]
         help: Aide pour l'IA, pour expliquer la question si on lui demande.
         required: false             # true par défaut
+      - id: style
+        label: Style recherché
+        type: text
+        suggestions: [Moderne, Campagne]   # réponses proposées en un clic (sans options)
 ```
+
+Dans le chat, la question en cours s'affiche avec des réponses en un clic : les options
+d'un choix, Oui / Non, des cases puis « Valider » pour un choix multiple, et pour une
+question ouverte les `suggestions` du questionnaire complétées par celles de l'IA.
 
 | `type` | Valeur enregistrée |
 | --- | --- |
