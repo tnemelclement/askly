@@ -1,25 +1,34 @@
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import { createHmac, timingSafeEqual } from 'node:crypto'
 import { PassThrough } from 'node:stream'
 import Anthropic from '@anthropic-ai/sdk'
 import cookie from '@fastify/cookie'
 import fastifyStatic from '@fastify/static'
-import { answers, type Db, forms, respondents } from '@questionnaire/db'
-import { count, desc, eq } from 'drizzle-orm'
+import type { Db } from '@questionnaire/db'
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify'
 import { z } from 'zod'
+import {
+  createRespondent,
+  deleteForm,
+  exportAnswers,
+  formOrThrow,
+  getRespondentDetail,
+  HttpError,
+  listFormSummaries,
+  listRespondents,
+  putForm,
+} from './admin.ts'
 import { pendingQuestion, runTurn, visibleMessages } from './ai.ts'
 import {
-  type Answers,
   allQuestions,
   type ChatEvent,
   type Form,
   formatAnswer,
   missingRequired,
-  respondentStatus,
   STATUS_LABELS,
   validateAnswer,
 } from './domain.ts'
-import { getForm, listForms, parseForm, type StoredForm, saveForm } from './forms.ts'
+import { registerMcp } from './mcp.ts'
+import { createLoginLimiter, createSigner, registerOAuth, verifyAccessToken } from './oauth.ts'
 import {
   findRespondentByToken,
   loadAnswers,
@@ -47,14 +56,10 @@ const MAX_MESSAGE_LENGTH = 2000
 /** Garde-fou de coût : au-delà, la conversation est manifestement détournée. */
 const MAX_USER_MESSAGES = 150
 
-// Pas de propriété de constructeur : Node exécute ces sources TS en retirant les types, sans transformer.
-class HttpError extends Error {
-  readonly statusCode: number
-  constructor(statusCode: number, message: string) {
-    super(message)
-    this.statusCode = statusCode
-  }
-}
+/** E-mail facultatif : le lien peut partir par WhatsApp ; `""` vaut absent. */
+const optionalEmail = z
+  .union([z.email().max(320), z.literal('').transform(() => undefined)])
+  .optional()
 
 export function buildApp({
   db,
@@ -73,9 +78,9 @@ export function buildApp({
 
   if (webDist) {
     app.register(fastifyStatic, { root: webDist, wildcard: false })
-    // Application monopage : toute route hors /api renvoie index.html.
+    // Application monopage : toute route hors /api (et hors découverte OAuth) renvoie index.html.
     app.setNotFoundHandler((req, reply) =>
-      req.method === 'GET' && !req.url.startsWith('/api/')
+      req.method === 'GET' && !req.url.startsWith('/api/') && !req.url.startsWith('/.well-known/')
         ? reply.sendFile('index.html')
         : reply.code(404).send({ error: 'Introuvable' }),
     )
@@ -83,6 +88,9 @@ export function buildApp({
 
   // Jeton de session admin = HMAC du mot de passe : changer ADMIN_PASSWORD déconnecte tout le monde.
   const sessionToken = createHmac('sha256', adminPassword).update('admin-session').digest('hex')
+  const signer = createSigner(adminPassword)
+  // Partagé par la connexion admin et la page d'autorisation OAuth.
+  const limiter = createLoginLimiter()
   const safeEqual = (a: string, b: string) => {
     const [x, y] = [Buffer.from(a), Buffer.from(b)]
     return x.length === y.length && timingSafeEqual(x, y)
@@ -104,20 +112,13 @@ export function buildApp({
     if (!value || !safeEqual(value, sessionToken)) throw new HttpError(401, 'Non connecté')
   }
 
-  async function formOrThrow(id: string): Promise<StoredForm> {
-    const form = await getForm(db, id)
-    if (!form) throw new HttpError(404, 'Questionnaire introuvable')
-    return form
-  }
-
   /** Liens publics : `PUBLIC_URL`, sinon le domaine par lequel on a été appelé (trustProxy). */
   const origin = (req: FastifyRequest) => publicUrl ?? `${req.protocol}://${req.host}`
-  const linkFor = (req: FastifyRequest, token: string) => `${origin(req)}/r/${token}`
 
   async function respondentOrThrow(token: string): Promise<{ respondent: Respondent; form: Form }> {
     const respondent = await findRespondentByToken(db, token)
     if (!respondent) throw new HttpError(404, 'Lien invalide')
-    return { respondent, form: await formOrThrow(respondent.formId) }
+    return { respondent, form: await formOrThrow(db, respondent.formId) }
   }
 
   async function conversation(form: Form, respondentId: string) {
@@ -221,7 +222,11 @@ export function buildApp({
 
   app.post('/api/admin/login', async (req, reply) => {
     const { password } = z.object({ password: z.string().max(200) }).parse(req.body)
-    if (!safeEqual(password, adminPassword)) throw new HttpError(401, 'Mot de passe incorrect')
+    if (limiter.blocked()) throw new HttpError(429, 'Trop de tentatives, réessayez plus tard')
+    if (!safeEqual(password, adminPassword)) {
+      limiter.fail()
+      throw new HttpError(401, 'Mot de passe incorrect')
+    }
     reply.setCookie(ADMIN_COOKIE, sessionToken, {
       path: '/api/admin',
       httpOnly: true,
@@ -242,155 +247,90 @@ export function buildApp({
     return { ok: true }
   })
 
+  const formParams = z.object({ formId: z.string() })
+
   app.get('/api/admin/forms', async (req) => {
     requireAdmin(req)
-    const rows = await db.select().from(respondents)
-    return (await listForms(db)).map((form) => {
-      const mine = rows.filter((r) => r.formId === form.id)
-      const statuses = mine.map(respondentStatus)
-      return {
-        id: form.id,
-        title: form.title,
-        intro: form.intro,
-        reusable: form.reusable,
-        questionCount: allQuestions(form).length,
-        respondents: mine.length,
-        done: statuses.filter((s) => s === 'done').length,
-        inProgress: statuses.filter((s) => s === 'in_progress').length,
-      }
-    })
+    return listFormSummaries(db)
   })
 
   app.get('/api/admin/forms/:formId', async (req) => {
     requireAdmin(req)
-    const form = await formOrThrow(z.object({ formId: z.string() }).parse(req.params).formId)
-    const rows = await db
-      .select({ respondent: respondents, answered: count(answers.questionId) })
-      .from(respondents)
-      .leftJoin(answers, eq(answers.respondentId, respondents.id))
-      .where(eq(respondents.formId, form.id))
-      .groupBy(respondents.id)
-      .orderBy(desc(respondents.createdAt))
-    return {
-      form,
-      respondents: rows.map(({ respondent, answered }) => ({
-        ...respondent,
-        status: respondentStatus(respondent),
-        answered,
-        link: linkFor(req, respondent.token),
-      })),
-    }
+    const form = await formOrThrow(db, formParams.parse(req.params).formId)
+    return { form, respondents: await listRespondents(db, form, origin(req)) }
   })
 
-  // Crée ou remplace un questionnaire. `definition` : l'objet, ou le même en texte YAML.
   app.put('/api/admin/forms/:formId', async (req) => {
     requireAdmin(req)
-    const { formId } = z.object({ formId: z.string() }).parse(req.params)
+    const { formId } = formParams.parse(req.params)
     const body = z
-      .object({ definition: z.unknown(), reusable: z.boolean().default(true) })
+      .object({ definition: z.unknown(), reusable: z.boolean().optional() })
       .parse(req.body)
-    let form: Form
-    try {
-      form = parseForm(formId, body.definition)
-    } catch (err) {
-      throw new HttpError(400, err instanceof Error ? err.message : 'Questionnaire invalide')
-    }
-    const { created } = await saveForm(db, form, body.reusable)
-    return {
-      id: form.id,
-      created,
-      questionCount: allQuestions(form).length,
-      adminUrl: `${origin(req)}/admin/forms/${form.id}`,
-    }
+    const saved = await putForm(db, formId, body.definition, body.reusable, 'upsert')
+    return { ...saved, adminUrl: `${origin(req)}/admin/forms/${saved.id}` }
   })
 
-  // Supprime le questionnaire et ses répondants (réponses et conversations suivent, en cascade).
   app.delete('/api/admin/forms/:formId', async (req) => {
     requireAdmin(req)
-    const form = await formOrThrow(z.object({ formId: z.string() }).parse(req.params).formId)
-    const deleted = await db.transaction(async (tx) => {
-      const gone = await tx.delete(respondents).where(eq(respondents.formId, form.id)).returning()
-      await tx.delete(forms).where(eq(forms.id, form.id))
-      return gone.length
-    })
-    return { id: form.id, deletedRespondents: deleted }
+    return deleteForm(db, formParams.parse(req.params).formId)
   })
 
   app.post('/api/admin/forms/:formId/respondents', async (req) => {
     requireAdmin(req)
-    const form = await formOrThrow(z.object({ formId: z.string() }).parse(req.params).formId)
     const body = z
-      .object({
-        name: z.string().trim().min(1).max(200),
-        // Facultatif : le lien peut partir par WhatsApp.
-        email: z.union([z.email().max(320), z.literal('').transform(() => undefined)]).optional(),
-      })
+      .object({ name: z.string().trim().min(1).max(200), email: optionalEmail })
       .parse(req.body)
-    const [created] = await db
-      .insert(respondents)
-      // 32 octets aléatoires : le lien est le seul secret du répondant.
-      .values({ ...body, formId: form.id, token: randomBytes(32).toString('base64url') })
-      .returning()
-    // biome-ignore lint/style/noNonNullAssertion: insert … returning renvoie la ligne
-    return { ...created!, link: linkFor(req, created!.token) }
+    return createRespondent(db, formParams.parse(req.params).formId, body, origin(req))
   })
 
   app.get('/api/admin/respondents/:id', async (req) => {
     requireAdmin(req)
     const { id } = z.object({ id: z.uuid() }).parse(req.params)
-    const respondent = await db.query.respondents.findFirst({ where: eq(respondents.id, id) })
-    if (!respondent) throw new HttpError(404, 'Répondant introuvable')
-    return {
-      respondent: { ...respondent, status: respondentStatus(respondent) },
-      form: await formOrThrow(respondent.formId),
-      answers: await loadAnswers(db, respondent.id),
-      messages: visibleMessages(await loadMessages(db, respondent.id)),
-    }
+    return getRespondentDetail(db, id, origin(req))
   })
 
   app.get('/api/admin/forms/:formId/export', async (req, reply) => {
     requireAdmin(req)
-    const form = await formOrThrow(z.object({ formId: z.string() }).parse(req.params).formId)
+    const form = await formOrThrow(db, formParams.parse(req.params).formId)
     const { format } = z.object({ format: z.enum(['json', 'csv']) }).parse(req.query)
-    const rows = await db.select().from(respondents).where(eq(respondents.formId, form.id))
-    const all = (
-      await db
-        .select({ a: answers })
-        .from(answers)
-        .innerJoin(respondents, eq(answers.respondentId, respondents.id))
-        .where(eq(respondents.formId, form.id))
-    ).map((r) => r.a)
-    const byRespondent = (id: string): Answers =>
-      Object.fromEntries(
-        all.filter((a) => a.respondentId === id).map((a) => [a.questionId, a.value]),
-      )
-    const questions = allQuestions(form)
+    const rows = await exportAnswers(db, form)
     sendDownload(reply, `${form.id}.${format}`)
     if (format === 'json') {
-      return rows.map((r) => ({
+      return rows.map(({ respondent: r, status, answers }) => ({
         name: r.name,
         email: r.email,
-        status: respondentStatus(r),
+        status,
         submittedAt: r.submittedAt,
-        answers: byRespondent(r.id),
+        answers,
       }))
     }
+    const questions = allQuestions(form)
     const header = ['Nom', 'E-mail', 'Statut', 'Envoyé le', ...questions.map((q) => q.label)]
-    const lines = rows.map((r) => {
-      const a = byRespondent(r.id)
-      return [
-        r.name,
-        r.email ?? '',
-        STATUS_LABELS[respondentStatus(r)],
-        r.submittedAt?.toISOString() ?? '',
-        // Nombres bruts : un tableur les lit comme des nombres, pas comme du texte « 3 000 ».
-        ...questions.map((q) =>
-          q.type === 'number' ? String(a[q.id] ?? '') : formatAnswer(q, a[q.id]),
-        ),
-      ]
-    })
+    const lines = rows.map(({ respondent: r, status, answers: a }) => [
+      r.name,
+      r.email ?? '',
+      STATUS_LABELS[status],
+      r.submittedAt?.toISOString() ?? '',
+      // Nombres bruts : un tableur les lit comme des nombres, pas comme du texte « 3 000 ».
+      ...questions.map((q) =>
+        q.type === 'number' ? String(a[q.id] ?? '') : formatAnswer(q, a[q.id]),
+      ),
+    ])
     // BOM : Excel ouvre alors le fichier en UTF-8 (accents intacts).
-    return `﻿${[header, ...lines].map(toCsvLine).join('\r\n')}\r\n`
+    return `\uFEFF${[header, ...lines].map(toCsvLine).join('\r\n')}\r\n`
+  })
+
+  // ─── MCP et OAuth (connecteur claude.ai) ──────────────────────────────────
+
+  registerOAuth(app, { adminPassword, origin, signer, safeEqual, limiter })
+  registerMcp(app, {
+    db,
+    origin,
+    authorize: (req) => {
+      const bearer = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1]
+      if (!bearer) return false
+      return Boolean(apiToken && safeEqual(bearer, apiToken)) || verifyAccessToken(signer, bearer)
+    },
   })
 
   return app
