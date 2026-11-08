@@ -10,6 +10,10 @@ const env = z
     ANTHROPIC_API_KEY: z.string().min(1),
     ADMIN_PASSWORD: z.string().min(8, 'ADMIN_PASSWORD : 8 caractères minimum'),
     API_PORT: z.coerce.number().default(3400),
+    // 0.0.0.0 dans le conteneur ; en local on reste sur la boucle.
+    HOST: z.string().default('127.0.0.1'),
+    WEB_DIST: z.string().optional(),
+    NODE_ENV: z.string().optional(),
   })
   .parse(process.env)
 
@@ -20,8 +24,13 @@ const app = buildApp({
   db: createDb(env.DATABASE_URL),
   anthropic: new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }),
   adminPassword: env.ADMIN_PASSWORD,
-  logger: { level: 'info', transport: { target: 'pino-pretty' } },
+  webDist: env.WEB_DIST,
+  // pino-pretty n'est qu'une dépendance de dev : JSON brut en production.
+  logger:
+    env.NODE_ENV === 'production'
+      ? { level: 'info' }
+      : { level: 'info', transport: { target: 'pino-pretty' } },
 })
 
-await app.listen({ port: env.API_PORT, host: '127.0.0.1' })
+await app.listen({ port: env.API_PORT, host: env.HOST })
 app.log.info(`${forms.length} questionnaire(s) chargé(s) depuis forms/`)

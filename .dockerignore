@@ -1,0 +1,13 @@
+# Ce qui ne doit jamais entrer dans une image.
+.env
+.env.*
+!.env.example
+
+node_modules
+**/node_modules
+**/dist
+.turbo
+**/.turbo
+.git
+.claude
+*.md

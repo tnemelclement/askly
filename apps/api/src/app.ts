@@ -2,6 +2,7 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { PassThrough } from 'node:stream'
 import Anthropic from '@anthropic-ai/sdk'
 import cookie from '@fastify/cookie'
+import fastifyStatic from '@fastify/static'
 import { answers, type Db, respondents } from '@questionnaire/db'
 import { count, desc, eq } from 'drizzle-orm'
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify'
@@ -33,6 +34,8 @@ export interface AppOptions {
   anthropic: Anthropic
   adminPassword: string
   logger?: boolean | object
+  /** Dossier du front compilé, servi sur le même domaine (production). */
+  webDist?: string
 }
 
 const ADMIN_COOKIE = 'admin_session'
@@ -40,18 +43,31 @@ const MAX_MESSAGE_LENGTH = 2000
 /** Garde-fou de coût : au-delà, la conversation est manifestement détournée. */
 const MAX_USER_MESSAGES = 150
 
+// Pas de propriété de constructeur : Node exécute ces sources TS en retirant les types, sans transformer.
 class HttpError extends Error {
-  constructor(
-    readonly statusCode: number,
-    message: string,
-  ) {
+  readonly statusCode: number
+  constructor(statusCode: number, message: string) {
     super(message)
+    this.statusCode = statusCode
   }
 }
 
-export function buildApp({ db, anthropic, adminPassword, logger = false }: AppOptions) {
-  const app = Fastify({ logger })
+export function buildApp({ db, anthropic, adminPassword, logger = false, webDist }: AppOptions) {
+  // trustProxy : derrière Traefik (Dokploy), pour l'IP et le protocole réels.
+  const app = Fastify({ logger, trustProxy: true })
   app.register(cookie)
+
+  app.get('/api/health', async () => ({ ok: true }))
+
+  if (webDist) {
+    app.register(fastifyStatic, { root: webDist, wildcard: false })
+    // Application monopage : toute route hors /api renvoie index.html.
+    app.setNotFoundHandler((req, reply) =>
+      req.method === 'GET' && !req.url.startsWith('/api/')
+        ? reply.sendFile('index.html')
+        : reply.code(404).send({ error: 'Introuvable' }),
+    )
+  }
 
   // Jeton de session admin = HMAC du mot de passe : changer ADMIN_PASSWORD déconnecte tout le monde.
   const sessionToken = createHmac('sha256', adminPassword).update('admin-session').digest('hex')
