@@ -28,6 +28,18 @@ messagerie (`mailto:`) : l'application n'envoie jamais de mail elle-même.
 
 Vérifications : `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`.
 
+## Déploiement
+
+En production sur https://ask.tnemelc.fr, via Dokploy (`admn.tnemelc.fr`, projet
+`questionnaire`) : une seule image (`Dockerfile` racine, l'API sert aussi le front),
+Postgres 18 à côté, migrations au démarrage. Chaque push sur `main` qui touche `apps/`,
+`packages/`, `forms/` ou le `Dockerfile` redéploie. Ajouter un questionnaire en prod, c'est
+donc committer son YAML dans `forms/`.
+
+Les variables de prod (`DATABASE_URL`, `ANTHROPIC_API_KEY`, `ADMIN_PASSWORD`,
+`NODE_ENV=production`) sont dans Dokploy ; copie des secrets dans le coffre iCloud
+(`Secrets/repos/questionnaire/.env.production`).
+
 ## Variables d'environnement (`.env` à la racine, jamais versionné)
 
 | Variable | Rôle |
