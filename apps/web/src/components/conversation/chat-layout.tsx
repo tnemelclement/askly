@@ -31,7 +31,7 @@ export function ChatLayout({
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-background">
-      <header className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3 sm:px-6">
+      <header className="flex shrink-0 items-center justify-between gap-3 border-b bg-background/80 px-4 py-3 backdrop-blur-2xl backdrop-saturate-150 sm:px-6">
         <div className="flex min-w-0 items-center gap-2">
           <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <ClipboardList className="size-4" aria-hidden="true" />
@@ -63,7 +63,7 @@ export function ChatLayout({
             <div className="mx-auto max-w-2xl">{children}</div>
           </main>
           {composer && (
-            <div className="shrink-0 border-t bg-background px-4 py-3 sm:px-6">
+            <div className="shrink-0 bg-background px-4 pt-2 pb-4 sm:px-6">
               <div className="mx-auto max-w-2xl">{composer}</div>
             </div>
           )}
@@ -73,11 +73,11 @@ export function ChatLayout({
           id={panelId}
           aria-label="Vos réponses"
           className={cn(
-            'w-[360px] shrink-0 border-l bg-muted/30',
+            'w-[360px] shrink-0 border-l bg-secondary',
             panelOpen
               ? 'absolute inset-y-0 right-0 z-20 block w-[min(360px,92vw)] bg-background shadow-xl'
               : 'hidden',
-            'xl:static xl:block xl:bg-muted/30 xl:shadow-none',
+            'xl:static xl:block xl:bg-secondary xl:shadow-none',
           )}
         >
           {panel}

@@ -30,7 +30,7 @@ function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-muted/40 p-4">
+    <div className="flex min-h-dvh items-center justify-center bg-secondary p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
           <div className="mb-2 flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">

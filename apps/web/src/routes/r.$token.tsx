@@ -185,7 +185,10 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
             Vos réponses ont été envoyées. Merci {initial.respondent.name} !
           </p>
         ) : (
-          <form onSubmit={onSubmitMessage} className="flex items-end gap-2">
+          <form
+            onSubmit={onSubmitMessage}
+            className="flex items-end gap-2 rounded-[26px] border bg-background p-1.5 pl-2 shadow-soft transition-colors focus-within:border-foreground"
+          >
             <label htmlFor="message" className="sr-only">
               Votre message
             </label>
@@ -204,12 +207,12 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
                 }
               }}
               placeholder="Votre réponse, ou une question si quelque chose n’est pas clair…"
-              className="max-h-40 min-h-11 resize-none"
+              className="max-h-40 min-h-10 resize-none border-0 bg-transparent px-3 py-2 shadow-none focus-visible:ring-0"
             />
             <Button
               type="submit"
               size="icon-lg"
-              className="size-11"
+              className="size-10"
               disabled={streaming || !draft.trim()}
               aria-label="Envoyer"
             >

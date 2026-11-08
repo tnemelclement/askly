@@ -34,7 +34,7 @@ export function GuideMessage({ children, className }: { children: ReactNode; cla
       >
         <Bot className="size-4" />
       </div>
-      <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-muted px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap">
+      <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-muted px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap">
         <span className="sr-only">Assistant : </span>
         {children}
       </div>
@@ -46,7 +46,7 @@ export function UserAnswer({ children }: { children: ReactNode }) {
   const entry = useEntryClass()
   return (
     <li className={cn('flex justify-end', entry)} data-message="answer">
-      <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-primary px-4 py-3 text-sm whitespace-pre-wrap text-primary-foreground">
+      <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-primary px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap text-primary-foreground">
         <span className="sr-only">Vous : </span>
         {children}
       </div>

@@ -34,7 +34,10 @@ export function QuickReplies({
               variant="outline"
               size="sm"
               aria-pressed={on}
-              className={cn('rounded-full', on && 'border-primary bg-primary/10 text-primary')}
+              className={cn(
+                on &&
+                  'border-primary bg-primary text-primary-foreground hover:bg-primary/85 hover:text-primary-foreground',
+              )}
               onClick={() => setSelected(on ? selected.filter((s) => s !== o) : [...selected, o])}
             >
               {on && <Check />}
@@ -45,7 +48,6 @@ export function QuickReplies({
         <Button
           type="button"
           size="sm"
-          className="rounded-full"
           disabled={selected.length === 0}
           // Ordre du questionnaire, pas celui des clics.
           onClick={() => onSend(options.filter((o) => selected.includes(o)).join(', '))}
@@ -68,7 +70,7 @@ export function QuickReplies({
           type="button"
           variant="outline"
           size="sm"
-          className="h-auto min-h-7 rounded-full py-1 text-left whitespace-normal"
+          className="h-auto min-h-8 py-1.5 text-left whitespace-normal"
           onClick={() => onSend(c)}
         >
           {c}
