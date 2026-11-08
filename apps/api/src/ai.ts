@@ -72,6 +72,8 @@ Règles :
 - Vouvoyez, en français, sur un ton chaleureux et professionnel. Messages courts : une ou deux phrases, puis la question.
 - Posez UNE question à la fois, dans l'ordre du questionnaire, en sautant celles déjà remplies (voir l'état fourni avec chaque message).
 - À la fin de CHAQUE message qui pose (ou repose) une question du questionnaire, y compris juste après un ${RECORD_ANSWER_TOOL}, appelez l'outil ${PRESENT_QUESTION_TOOL} : il affiche sous votre message des réponses en un clic. Pour une question à choix ou oui/non, les boutons reprennent les options : inutile de les énumérer dans le texte, sauf pour les expliquer. Pour une question ouverte, proposez si possible 2 à 4 réponses courtes et plausibles, adaptées à ce que vous savez déjà du répondant ; le répondant peut toujours écrire autre chose.
+- Chaque message que vous écrivez contient du texte : ne vous contentez jamais d'appeler les outils.
+- Ne demandez jamais un format technique (AAAA-MM-JJ, nombre sans unité…) : la personne répond comme elle veut, vous convertissez. Les réponses proposées sont écrites comme la personne les dirait (« mars 2019 », pas « 2019-03-01 »). N'en proposez pas pour ce que vous ne pouvez pas deviner (prénom, âge, date personnelle, coordonnées).
 - Si la personne ne comprend pas ou demande des précisions, expliquez simplement, avec un exemple concret, puis aidez-la à formuler sa réponse. Appuyez-vous sur l'« aide » de la question.
 - Dès qu'une réponse est claire, enregistrez-la avec l'outil ${RECORD_ANSWER_TOOL}, puis enchaînez. Une réponse peut en couvrir plusieurs : enregistrez chacune.
 - Si la réponse est ambiguë ou incomplète, demandez une précision au lieu de deviner. N'inventez jamais une réponse.
@@ -261,9 +263,10 @@ export async function runTurn(opts: {
   const system = buildSystemPrompt(form)
   const tools = [buildRecordAnswerTool(form), buildPresentQuestionTool(form)]
 
-  let presented = false
+  let presented = null as string | null
+  let spoke = false
   const track = (e: ChatEvent) => {
-    if (e.type === 'question') presented = true
+    if (e.type === 'question') presented = e.questionId
     emit(e)
   }
 
@@ -301,6 +304,7 @@ export async function runTurn(opts: {
       .map((b) => b.text)
       .join('')
       .trim()
+    if (text) spoke = true
     const toolUses = final.content.filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
     const rows: NewMessage[] = [
       { role: 'assistant', content: final.content, display: text || null },
@@ -340,13 +344,23 @@ export async function runTurn(opts: {
     )
     if (pending) emit({ type: 'question', ...pending })
   }
+
+  // Le modèle a parfois affiché les boutons sans écrire la question : on l'écrit à sa place.
+  const silent = !spoke && presented && allQuestions(form).find((q) => q.id === presented)
+  if (silent) {
+    emit({ type: 'message_start' })
+    emit({ type: 'text', text: silent.label })
+    await appendMessages(db, respondent.id, [
+      { role: 'assistant', content: [{ type: 'text', text: silent.label }], display: silent.label },
+    ])
+  }
 }
 
 /**
  * Question en attente de réponse (boutons sous le fil, en direct comme après un
  * rechargement) : le dernier `present_question` qui n'a pas été suivi d'un message du
  * répondant. Le modèle oublie parfois l'outil : si son dernier message contient une
- * question, on retient la première question restante, dans l'ordre du questionnaire.
+ * question, on retient celle qui suit la dernière remplie (`nextQuestion`).
  */
 export function pendingQuestion(
   form: Form,
@@ -368,8 +382,19 @@ export function pendingQuestion(
     }
   }
   if (pending || !lastText?.includes('?')) return pending
-  const next = allQuestions(form).find((q) => answers[q.id] === undefined)
+  const next = nextQuestion(form, answers)
   return next ? { questionId: next.id, suggestions: mergeSuggestions(next, []) } : null
+}
+
+/**
+ * Question que l'IA pose a priori : la première vide après la dernière remplie (une
+ * facultative passée reste vide derrière), sinon la première vide.
+ */
+export function nextQuestion(form: Form, answers: Answers): Question | undefined {
+  const all = allQuestions(form)
+  const last = all.findLastIndex((q) => answers[q.id] !== undefined)
+  const empty = (q: Question) => answers[q.id] === undefined
+  return all.slice(last + 1).find(empty) ?? all.find(empty)
 }
 
 /** Messages visibles du fil (le reste est technique : état, outils). */

@@ -84,6 +84,14 @@ describe('question en attente (reprise)', () => {
     expect(pendingQuestion(form, [user('Artisan'), told], {})).toBeNull()
   })
 
+  it('passe une facultative laissée vide derrière la dernière réponse', () => {
+    const asked = { role: 'assistant' as const, display: 'Êtes-vous d’accord ?', content: [] }
+    expect(pendingQuestion(form, [user('B'), asked], { offre: 'B' })).toEqual({
+      questionId: 'ok',
+      suggestions: [],
+    })
+  })
+
   it('ignore une question inconnue', () => {
     expect(pendingQuestion(form, [present('inexistante')], {})).toBeNull()
   })
