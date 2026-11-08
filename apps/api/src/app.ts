@@ -7,7 +7,7 @@ import { answers, type Db, respondents } from '@questionnaire/db'
 import { count, desc, eq } from 'drizzle-orm'
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify'
 import { z } from 'zod'
-import { runTurn, visibleMessages } from './ai.ts'
+import { pendingQuestion, runTurn, visibleMessages } from './ai.ts'
 import {
   type Answers,
   allQuestions,
@@ -19,7 +19,7 @@ import {
   STATUS_LABELS,
   validateAnswer,
 } from './domain.ts'
-import { getForm, listForms } from './forms.ts'
+import { getForm, listForms, parseForm, type StoredForm, saveForm } from './forms.ts'
 import {
   findRespondentByToken,
   loadAnswers,
@@ -33,6 +33,10 @@ export interface AppOptions {
   db: Db
   anthropic: Anthropic
   adminPassword: string
+  /** Jeton pour piloter l'admin par l'API (skill de Claude) ; absent = API admin par cookie seulement. */
+  apiToken?: string
+  /** Adresse publique de l'app (ex. https://ask.tnemelc.fr), pour les liens renvoyés. */
+  publicUrl?: string
   logger?: boolean | object
   /** Dossier du front compilé, servi sur le même domaine (production). */
   webDist?: string
@@ -52,7 +56,15 @@ class HttpError extends Error {
   }
 }
 
-export function buildApp({ db, anthropic, adminPassword, logger = false, webDist }: AppOptions) {
+export function buildApp({
+  db,
+  anthropic,
+  adminPassword,
+  apiToken,
+  publicUrl,
+  logger = false,
+  webDist,
+}: AppOptions) {
   // trustProxy : derrière Traefik (Dokploy), pour l'IP et le protocole réels.
   const app = Fastify({ logger, trustProxy: true })
   app.register(cookie)
@@ -86,20 +98,36 @@ export function buildApp({ db, anthropic, adminPassword, logger = false, webDist
   })
 
   function requireAdmin(req: FastifyRequest) {
+    const bearer = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1]
+    if (apiToken && bearer && safeEqual(bearer, apiToken)) return
     const value = req.cookies[ADMIN_COOKIE]
     if (!value || !safeEqual(value, sessionToken)) throw new HttpError(401, 'Non connecté')
   }
 
-  function formOrThrow(id: string): Form {
-    const form = getForm(id)
+  async function formOrThrow(id: string): Promise<StoredForm> {
+    const form = await getForm(db, id)
     if (!form) throw new HttpError(404, 'Questionnaire introuvable')
     return form
   }
 
+  /** Liens publics : `PUBLIC_URL`, sinon le domaine par lequel on a été appelé (trustProxy). */
+  const origin = (req: FastifyRequest) => publicUrl ?? `${req.protocol}://${req.host}`
+  const linkFor = (req: FastifyRequest, token: string) => `${origin(req)}/r/${token}`
+
   async function respondentOrThrow(token: string): Promise<{ respondent: Respondent; form: Form }> {
     const respondent = await findRespondentByToken(db, token)
     if (!respondent) throw new HttpError(404, 'Lien invalide')
-    return { respondent, form: formOrThrow(respondent.formId) }
+    return { respondent, form: await formOrThrow(respondent.formId) }
+  }
+
+  async function conversation(form: Form, respondentId: string) {
+    const rows = await loadMessages(db, respondentId)
+    const answers = await loadAnswers(db, respondentId)
+    return {
+      answers,
+      messages: visibleMessages(rows),
+      pending: pendingQuestion(form, rows, answers),
+    }
   }
 
   const tokenParams = z.object({ token: z.string().min(1).max(100) })
@@ -111,8 +139,7 @@ export function buildApp({ db, anthropic, adminPassword, logger = false, webDist
     return {
       form,
       respondent: { name: respondent.name, submittedAt: respondent.submittedAt },
-      answers: await loadAnswers(db, respondent.id),
-      messages: visibleMessages(await loadMessages(db, respondent.id)),
+      ...(await conversation(form, respondent.id)),
     }
   })
 
@@ -218,13 +245,14 @@ export function buildApp({ db, anthropic, adminPassword, logger = false, webDist
   app.get('/api/admin/forms', async (req) => {
     requireAdmin(req)
     const rows = await db.select().from(respondents)
-    return listForms().map((form) => {
+    return (await listForms(db)).map((form) => {
       const mine = rows.filter((r) => r.formId === form.id)
       const statuses = mine.map(respondentStatus)
       return {
         id: form.id,
         title: form.title,
         intro: form.intro,
+        reusable: form.reusable,
         questionCount: allQuestions(form).length,
         respondents: mine.length,
         done: statuses.filter((s) => s === 'done').length,
@@ -235,7 +263,7 @@ export function buildApp({ db, anthropic, adminPassword, logger = false, webDist
 
   app.get('/api/admin/forms/:formId', async (req) => {
     requireAdmin(req)
-    const form = formOrThrow(z.object({ formId: z.string() }).parse(req.params).formId)
+    const form = await formOrThrow(z.object({ formId: z.string() }).parse(req.params).formId)
     const rows = await db
       .select({ respondent: respondents, answered: count(answers.questionId) })
       .from(respondents)
@@ -249,22 +277,50 @@ export function buildApp({ db, anthropic, adminPassword, logger = false, webDist
         ...respondent,
         status: respondentStatus(respondent),
         answered,
+        link: linkFor(req, respondent.token),
       })),
+    }
+  })
+
+  // Crée ou remplace un questionnaire. `definition` : l'objet, ou le même en texte YAML.
+  app.put('/api/admin/forms/:formId', async (req) => {
+    requireAdmin(req)
+    const { formId } = z.object({ formId: z.string() }).parse(req.params)
+    const body = z
+      .object({ definition: z.unknown(), reusable: z.boolean().default(true) })
+      .parse(req.body)
+    let form: Form
+    try {
+      form = parseForm(formId, body.definition)
+    } catch (err) {
+      throw new HttpError(400, err instanceof Error ? err.message : 'Questionnaire invalide')
+    }
+    const { created } = await saveForm(db, form, body.reusable)
+    return {
+      id: form.id,
+      created,
+      questionCount: allQuestions(form).length,
+      adminUrl: `${origin(req)}/admin/forms/${form.id}`,
     }
   })
 
   app.post('/api/admin/forms/:formId/respondents', async (req) => {
     requireAdmin(req)
-    const form = formOrThrow(z.object({ formId: z.string() }).parse(req.params).formId)
+    const form = await formOrThrow(z.object({ formId: z.string() }).parse(req.params).formId)
     const body = z
-      .object({ name: z.string().trim().min(1).max(200), email: z.email().max(320) })
+      .object({
+        name: z.string().trim().min(1).max(200),
+        // Facultatif : le lien peut partir par WhatsApp.
+        email: z.union([z.email().max(320), z.literal('').transform(() => undefined)]).optional(),
+      })
       .parse(req.body)
     const [created] = await db
       .insert(respondents)
       // 32 octets aléatoires : le lien est le seul secret du répondant.
       .values({ ...body, formId: form.id, token: randomBytes(32).toString('base64url') })
       .returning()
-    return created
+    // biome-ignore lint/style/noNonNullAssertion: insert … returning renvoie la ligne
+    return { ...created!, link: linkFor(req, created!.token) }
   })
 
   app.get('/api/admin/respondents/:id', async (req) => {
@@ -274,7 +330,7 @@ export function buildApp({ db, anthropic, adminPassword, logger = false, webDist
     if (!respondent) throw new HttpError(404, 'Répondant introuvable')
     return {
       respondent: { ...respondent, status: respondentStatus(respondent) },
-      form: formOrThrow(respondent.formId),
+      form: await formOrThrow(respondent.formId),
       answers: await loadAnswers(db, respondent.id),
       messages: visibleMessages(await loadMessages(db, respondent.id)),
     }
@@ -282,7 +338,7 @@ export function buildApp({ db, anthropic, adminPassword, logger = false, webDist
 
   app.get('/api/admin/forms/:formId/export', async (req, reply) => {
     requireAdmin(req)
-    const form = formOrThrow(z.object({ formId: z.string() }).parse(req.params).formId)
+    const form = await formOrThrow(z.object({ formId: z.string() }).parse(req.params).formId)
     const { format } = z.object({ format: z.enum(['json', 'csv']) }).parse(req.query)
     const rows = await db.select().from(respondents).where(eq(respondents.formId, form.id))
     const all = (
@@ -312,7 +368,7 @@ export function buildApp({ db, anthropic, adminPassword, logger = false, webDist
       const a = byRespondent(r.id)
       return [
         r.name,
-        r.email,
+        r.email ?? '',
         STATUS_LABELS[respondentStatus(r)],
         r.submittedAt?.toISOString() ?? '',
         // Nombres bruts : un tableur les lit comme des nombres, pas comme du texte « 3 000 ».

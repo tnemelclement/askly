@@ -11,6 +11,7 @@ interface FormSummary {
   id: string
   title: string
   intro: string
+  reusable: boolean
   questionCount: number
   respondents: number
   done: number
@@ -48,6 +49,7 @@ function FormsPage() {
                 </CardTitle>
                 <CardDescription className="line-clamp-2">{f.intro}</CardDescription>
                 <div className="flex flex-wrap gap-2 pt-2">
+                  {!f.reusable && <Badge variant="outline">Ponctuel</Badge>}
                   <Badge variant="secondary">{f.questionCount} questions</Badge>
                   <Badge variant="outline">
                     {f.respondents} répondant{f.respondents > 1 ? 's' : ''}

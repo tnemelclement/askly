@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createDb } from '@questionnaire/db'
 import { z } from 'zod'
 import { buildApp } from './app.ts'
-import { listForms } from './forms.ts'
+import { seedForms } from './forms.ts'
 
 const env = z
   .object({
@@ -13,17 +13,22 @@ const env = z
     // 0.0.0.0 dans le conteneur ; en local on reste sur la boucle.
     HOST: z.string().default('127.0.0.1'),
     WEB_DIST: z.string().optional(),
+    PUBLIC_URL: z.url().optional(),
+    ADMIN_API_TOKEN: z.string().min(32, 'ADMIN_API_TOKEN : 32 caractères minimum').optional(),
     NODE_ENV: z.string().optional(),
   })
   .parse(process.env)
 
-// Un YAML invalide doit casser le démarrage, pas la première page qui le lit.
-const forms = listForms()
+const db = createDb(env.DATABASE_URL)
+// Amorce une base neuve avec les YAML de forms/ ; un YAML invalide casse le démarrage.
+const seeded = await seedForms(db)
 
 const app = buildApp({
-  db: createDb(env.DATABASE_URL),
+  db,
   anthropic: new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }),
   adminPassword: env.ADMIN_PASSWORD,
+  apiToken: env.ADMIN_API_TOKEN,
+  publicUrl: env.PUBLIC_URL?.replace(/\/$/, ''),
   webDist: env.WEB_DIST,
   // pino-pretty n'est qu'une dépendance de dev : JSON brut en production.
   logger:
@@ -33,4 +38,4 @@ const app = buildApp({
 })
 
 await app.listen({ port: env.API_PORT, host: env.HOST })
-app.log.info(`${forms.length} questionnaire(s) chargé(s) depuis forms/`)
+if (seeded > 0) app.log.info(`${seeded} questionnaire(s) importé(s) depuis forms/`)

@@ -31,14 +31,11 @@ interface RespondentRow {
   id: string
   token: string
   name: string
-  email: string
+  email: string | null
+  link: string
   status: RespondentStatus
   answered: number
   createdAt: string
-}
-
-function respondentLink(token: string) {
-  return `${window.location.origin}/r/${token}`
 }
 
 /** Brouillon de mail dans le client de l'utilisateur : rien n'est envoyé sans lui. */
@@ -48,10 +45,10 @@ function mailtoHref(form: Form, r: RespondentRow) {
 
 Pourriez-vous prendre quelques minutes pour répondre à ce questionnaire ? Il se remplit sous forme de conversation : vous pouvez demander des précisions à tout moment, et reprendre plus tard avec le même lien.
 
-${respondentLink(r.token)}
+${r.link}
 
 Merci d'avance,`
-  return `mailto:${encodeURIComponent(r.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+  return `mailto:${encodeURIComponent(r.email ?? '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
 }
 
 function FormPage() {
@@ -130,11 +127,12 @@ function FormPage() {
               <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="email">E-mail</Label>
+              <Label htmlFor="email">
+                E-mail <span className="font-normal text-muted-foreground">(facultatif)</span>
+              </Label>
               <Input
                 id="email"
                 type="email"
-                required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
@@ -183,25 +181,27 @@ function FormPage() {
                         aria-label={`Copier le lien de ${r.name}`}
                         title="Copier le lien"
                         onClick={async () => {
-                          await navigator.clipboard.writeText(respondentLink(r.token))
+                          await navigator.clipboard.writeText(r.link)
                           toast.success('Lien copié')
                         }}
                       >
                         <Copy />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        asChild
-                        title="Préparer le mail (brouillon)"
-                      >
-                        <a
-                          href={mailtoHref(form, r)}
-                          aria-label={`Préparer le mail pour ${r.name}`}
+                      {r.email && (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          asChild
+                          title="Préparer le mail (brouillon)"
                         >
-                          <Mail />
-                        </a>
-                      </Button>
+                          <a
+                            href={mailtoHref(form, r)}
+                            aria-label={`Préparer le mail pour ${r.name}`}
+                          >
+                            <Mail />
+                          </a>
+                        </Button>
+                      )}
                       <Button variant="ghost" size="icon-sm" asChild title="Voir les réponses">
                         <Link
                           to="/admin/respondents/$respondentId"

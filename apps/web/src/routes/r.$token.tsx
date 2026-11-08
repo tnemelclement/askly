@@ -13,6 +13,7 @@ import {
   ThinkingMessage,
   UserAnswer,
 } from '@/components/conversation/conversation'
+import { QuickReplies } from '@/components/conversation/quick-replies'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { api, type ChatEvent, streamChat } from '@/lib/api'
@@ -25,11 +26,18 @@ interface Bubble {
   text: string
 }
 
+/** Question en cours, avec ses réponses proposées. */
+interface Pending {
+  questionId: string
+  suggestions: string[]
+}
+
 interface RespondentData {
   form: Form
   respondent: { name: string; submittedAt: string | null }
   answers: Answers
   messages: { id: number; role: 'user' | 'assistant'; text: string }[]
+  pending: Pending | null
 }
 
 function RespondentPage() {
@@ -63,12 +71,14 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
   // Vrai entre le début d'un tour assistant et son premier mot : on montre « écrit… ».
   const [waiting, setWaiting] = useState(false)
   const [draft, setDraft] = useState('')
+  const [pending, setPending] = useState<Pending | null>(initial.pending)
   const [submitting, setSubmitting] = useState(false)
   const scrollRef = useRef<HTMLElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const kickedOff = useRef(false)
 
   async function send(message: string | null) {
+    setPending(null)
     setStreaming(true)
     setWaiting(true)
     if (message) setBubbles((b) => [...b, { id: `u${Date.now()}`, role: 'user', text: message }])
@@ -88,6 +98,8 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
           const id = current
           setBubbles((b) => b.map((x) => (x.id === id ? { ...x, text: x.text + e.text } : x)))
         }
+      } else if (e.type === 'question') {
+        setPending({ questionId: e.questionId, suggestions: e.suggestions })
       } else if (e.type === 'answer') {
         setAnswers((a) => ({ ...a, [e.questionId]: e.value }))
       } else if (e.type === 'error') {
@@ -116,7 +128,7 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
   // biome-ignore lint/correctness/useExhaustiveDependencies: on suit le contenu du fil.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
-  }, [bubbles, waiting])
+  }, [bubbles, waiting, pending])
 
   function onSubmitMessage(e?: React.FormEvent) {
     e?.preventDefault()
@@ -150,6 +162,7 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
 
   const answeredCount = Object.keys(answers).length
   const total = allQuestions(form).length
+  const pendingQuestion = pending && allQuestions(form).find((q) => q.id === pending.questionId)
 
   return (
     <ChatLayout
@@ -216,6 +229,17 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
           ),
         )}
         {waiting && <ThinkingMessage />}
+        {!streaming && !locked && pendingQuestion && (
+          <li>
+            <QuickReplies
+              // Remis à zéro (cases cochées) à chaque nouvelle question.
+              key={`${pendingQuestion.id}-${bubbles.length}`}
+              question={pendingQuestion}
+              suggestions={pending?.suggestions ?? []}
+              onSend={(text) => void send(text)}
+            />
+          </li>
+        )}
       </ConversationThread>
     </ChatLayout>
   )

@@ -23,11 +23,19 @@ const questionSchema = z
     help: z.string().optional(),
     type: z.enum(QUESTION_TYPES),
     options: z.array(z.string().min(1)).min(2).optional(),
+    /** Réponses proposées en un clic pour une question ouverte (le répondant peut aussi écrire). */
+    suggestions: z.array(z.string().min(1).max(200)).min(1).max(6).optional(),
     required: z.boolean().default(true),
   })
   .refine((q) => (q.type === 'choice' || q.type === 'multichoice') === Boolean(q.options), {
     message: '`options` est requis pour choice/multichoice, et interdit pour les autres types',
   })
+  .refine((q) => !(q.suggestions && q.options), {
+    message: '`suggestions` est réservé aux questions sans `options`',
+  })
+
+/** Identifiant d'un questionnaire : il apparaît dans les URL de l'admin. */
+export const FORM_ID = /^[a-z0-9][a-z0-9-]{1,62}$/
 
 export const formSchema = z
   .strictObject({
@@ -60,6 +68,7 @@ export type ChatEvent =
   | { type: 'message_start' }
   | { type: 'text'; text: string }
   | { type: 'answer'; questionId: string; value: AnswerValue }
+  | { type: 'question'; questionId: string; suggestions: string[] }
   | { type: 'error'; message: string }
   | { type: 'done' }
 

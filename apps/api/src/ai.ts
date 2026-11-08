@@ -30,6 +30,7 @@ import {
 
 export const AI_MODEL = 'claude-haiku-5-5'
 export const RECORD_ANSWER_TOOL = 'record_answer'
+export const PRESENT_QUESTION_TOOL = 'present_question'
 /** Garde-fou contre une boucle d'outils sans fin dans un même tour. */
 const MAX_STEPS = 6
 
@@ -63,7 +64,7 @@ ${form.context ? `\nContexte (pour vous, ne pas le réciter) : ${form.context.tr
 Règles :
 - Vouvoyez, en français, sur un ton chaleureux et professionnel. Messages courts : une ou deux phrases, puis la question.
 - Posez UNE question à la fois, dans l'ordre du questionnaire, en sautant celles déjà remplies (voir l'état fourni avec chaque message).
-- Pour une question à choix, proposez les options telles quelles.
+- À la fin de CHAQUE message qui pose (ou repose) une question du questionnaire, y compris juste après un ${RECORD_ANSWER_TOOL}, appelez l'outil ${PRESENT_QUESTION_TOOL} : il affiche sous votre message des réponses en un clic. Pour une question à choix ou oui/non, les boutons reprennent les options : inutile de les énumérer dans le texte, sauf pour les expliquer. Pour une question ouverte, proposez si possible 2 à 4 réponses courtes et plausibles, adaptées à ce que vous savez déjà du répondant ; le répondant peut toujours écrire autre chose.
 - Si la personne ne comprend pas ou demande des précisions, expliquez simplement, avec un exemple concret, puis aidez-la à formuler sa réponse. Appuyez-vous sur l'« aide » de la question.
 - Dès qu'une réponse est claire, enregistrez-la avec l'outil ${RECORD_ANSWER_TOOL}, puis enchaînez. Une réponse peut en couvrir plusieurs : enregistrez chacune.
 - Si la réponse est ambiguë ou incomplète, demandez une précision au lieu de deviner. N'inventez jamais une réponse.
@@ -109,6 +110,47 @@ export function buildRecordAnswerTool(form: Form): Anthropic.Tool {
   }
 }
 
+export function buildPresentQuestionTool(form: Form): Anthropic.Tool {
+  return {
+    name: PRESENT_QUESTION_TOOL,
+    description:
+      "Affiche, sous votre message, la question posée avec des réponses cliquables. Les options d'une question à choix ou oui/non s'affichent d'office ; `suggestions` sert aux questions ouvertes.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        question_id: {
+          type: 'string',
+          enum: allQuestions(form).map((q) => q.id),
+          description: 'La question que vous venez de poser.',
+        },
+        suggestions: {
+          type: 'array',
+          items: { type: 'string' },
+          maxItems: 4,
+          description:
+            'Pour une question ouverte : 2 à 4 réponses courtes et plausibles (60 caractères max chacune). Omettez pour une question à choix.',
+        },
+      },
+      required: ['question_id'],
+      additionalProperties: false,
+    },
+  }
+}
+
+/**
+ * Réponses proposées pour une question : celles du questionnaire d'abord, puis celles de
+ * l'IA (filtrées : chaînes courtes, sans doublon). Les questions à options n'en ont pas,
+ * l'interface affiche leurs options.
+ */
+export function mergeSuggestions(q: Question, fromAi: unknown): string[] {
+  if (q.options || q.type === 'yesno') return []
+  const ai = Array.isArray(fromAi)
+    ? fromAi.filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+    : []
+  const all = [...(q.suggestions ?? []), ...ai.map((v) => v.trim().slice(0, 120))]
+  return [...new Set(all)].slice(0, 6)
+}
+
 /** État joint à chaque message du répondant : ce qui est rempli, ce qui manque. */
 export function describeState(form: Form, answers: Answers): string {
   const lines = allQuestions(form).map((q) =>
@@ -121,8 +163,9 @@ export function describeState(form: Form, answers: Answers): string {
 }
 
 const toolInputSchema = z.object({ question_id: z.string(), value: z.unknown() })
+const presentInputSchema = z.object({ question_id: z.string(), suggestions: z.unknown() })
 
-/** Applique un appel `record_answer` : validation, enregistrement, résultat pour le modèle. */
+/** Applique un appel d'outil (validation, enregistrement ou affichage) ; renvoie le résultat pour le modèle. */
 export async function applyToolCall(
   db: Db,
   form: Form,
@@ -136,6 +179,19 @@ export async function applyToolCall(
     is_error: true,
     content,
   })
+  if (block.name === PRESENT_QUESTION_TOOL) {
+    const input = presentInputSchema.safeParse(block.input)
+    const question = input.success
+      ? allQuestions(form).find((q) => q.id === input.data.question_id)
+      : undefined
+    if (!input.success || !question) return fail('question_id inconnu')
+    emit({
+      type: 'question',
+      questionId: question.id,
+      suggestions: mergeSuggestions(question, input.data.suggestions),
+    })
+    return { type: 'tool_result', tool_use_id: block.id, content: 'Affiché.' }
+  }
   if (block.name !== RECORD_ANSWER_TOOL) return fail(`outil inconnu : ${block.name}`)
   const input = toolInputSchema.safeParse(block.input)
   if (!input.success) return fail('entrée invalide : { question_id, value } attendu')
@@ -185,7 +241,13 @@ export async function runTurn(opts: {
   ])
 
   const system = buildSystemPrompt(form)
-  const tools = [buildRecordAnswerTool(form)]
+  const tools = [buildRecordAnswerTool(form), buildPresentQuestionTool(form)]
+
+  let presented = false
+  const track = (e: ChatEvent) => {
+    if (e.type === 'question') presented = true
+    emit(e)
+  }
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const history = (await loadMessages(db, respondent.id)).map(
@@ -238,15 +300,58 @@ export async function runTurn(opts: {
                 is_error: true,
                 content: 'entrée tronquée, recommencez',
               }
-            : await applyToolCall(db, form, respondent.id, block, emit),
+            : await applyToolCall(db, form, respondent.id, block, track),
         )
       }
       // Tous les résultats dans UN message utilisateur, juste après le tour assistant.
       rows.push({ role: 'user', content: results, display: null })
     }
     await appendMessages(db, respondent.id, rows)
-    if (toolUses.length === 0) return
+    // Rien à attendre du modèle après le seul affichage de la question : le tour est fini, et
+    // le message suivant du répondant suivra ce tool_result (deux messages `user` d'affilée,
+    // que l'API fusionne).
+    if (toolUses.every((b) => b.name === PRESENT_QUESTION_TOOL)) break
   }
+
+  // Filet de sécurité : boutons de la question en cours si le modèle n'a pas appelé l'outil.
+  if (!presented) {
+    const pending = pendingQuestion(
+      form,
+      await loadMessages(db, respondent.id),
+      await loadAnswers(db, respondent.id),
+    )
+    if (pending) emit({ type: 'question', ...pending })
+  }
+}
+
+/**
+ * Question en attente de réponse (boutons sous le fil, en direct comme après un
+ * rechargement) : le dernier `present_question` qui n'a pas été suivi d'un message du
+ * répondant. Le modèle oublie parfois l'outil : si son dernier message contient une
+ * question, on retient la première question restante, dans l'ordre du questionnaire.
+ */
+export function pendingQuestion(
+  form: Form,
+  rows: { role: 'user' | 'assistant'; content: unknown[]; display: string | null }[],
+  answers: Answers,
+): { questionId: string; suggestions: string[] } | null {
+  let pending: { questionId: string; suggestions: string[] } | null = null
+  let lastText: string | null = null
+  for (const m of rows) {
+    if (m.role === 'user' && m.display !== null) pending = null
+    if (m.display !== null) lastText = m.role === 'assistant' ? m.display : null
+    if (m.role !== 'assistant') continue
+    for (const block of m.content as { type?: string; name?: string; input?: unknown }[]) {
+      if (block.type !== 'tool_use' || block.name !== PRESENT_QUESTION_TOOL) continue
+      const input = presentInputSchema.safeParse(block.input)
+      const q = input.success && allQuestions(form).find((x) => x.id === input.data.question_id)
+      if (q)
+        pending = { questionId: q.id, suggestions: mergeSuggestions(q, input.data.suggestions) }
+    }
+  }
+  if (pending || !lastText?.includes('?')) return pending
+  const next = allQuestions(form).find((q) => answers[q.id] === undefined)
+  return next ? { questionId: next.id, suggestions: mergeSuggestions(next, []) } : null
 }
 
 /** Messages visibles du fil (le reste est technique : état, outils). */

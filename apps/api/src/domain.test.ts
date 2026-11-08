@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { formatAnswer, validateAnswer } from './domain.ts'
-import { listForms, parseForm } from './forms.ts'
+import { parseForm, readFormFiles } from './forms.ts'
 
 const YAML = `
 title: Test
@@ -25,7 +25,7 @@ describe('validation du YAML', () => {
   })
 
   it('valide les questionnaires livrés dans forms/', () => {
-    expect(listForms().length).toBeGreaterThan(0)
+    expect(readFormFiles().length).toBeGreaterThan(0)
   })
 
   it.each([

@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
 import {
+  boolean,
   index,
   integer,
   jsonb,
@@ -11,6 +12,20 @@ import {
 } from 'drizzle-orm/pg-core'
 
 /**
+ * Un questionnaire : sa définition (titre, sections, questions) validée par `formSchema` de
+ * l'API avant d'entrer ici. Créé par l'API admin (le skill de Claude) ou importé des YAML
+ * de `forms/` au démarrage.
+ */
+export const forms = pgTable('forms', {
+  id: text().primaryKey(),
+  definition: jsonb().$type<unknown>().notNull(),
+  /** `false` = questionnaire ponctuel, écrit pour une seule personne. */
+  reusable: boolean().notNull().default(true),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+})
+
+/**
  * Un répondant = une personne invitée à remplir un questionnaire (`forms/<formId>.yaml`),
  * avec son propre lien `/r/<token>`. Statut dérivé : `submittedAt` → terminé,
  * `startedAt` → en cours, sinon pas commencé.
@@ -20,7 +35,8 @@ export const respondents = pgTable('respondents', {
   token: text().notNull().unique(),
   formId: text().notNull(),
   name: text().notNull(),
-  email: text().notNull(),
+  /** Facultatif : le lien s'envoie aussi par WhatsApp. */
+  email: text(),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   startedAt: timestamp({ withTimezone: true }),
   submittedAt: timestamp({ withTimezone: true }),

@@ -1,0 +1,79 @@
+import type { Question } from '@questionnaire/api/domain'
+import { Check } from 'lucide-react'
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+
+/**
+ * Réponses en un clic sous la question en cours : les options d'un choix, Oui / Non, des
+ * cases à cocher puis « Valider » pour un choix multiple, ou les réponses proposées d'une
+ * question ouverte. Un clic envoie la réponse comme si le répondant l'avait écrite ; il peut
+ * toujours écrire autre chose.
+ */
+export function QuickReplies({
+  question,
+  suggestions,
+  onSend,
+}: {
+  question: Question
+  suggestions: string[]
+  onSend: (text: string) => void
+}) {
+  const [selected, setSelected] = useState<string[]>([])
+
+  if (question.type === 'multichoice') {
+    const options = question.options ?? []
+    return (
+      <fieldset className="ml-11 flex flex-wrap gap-2" aria-label={question.label}>
+        {options.map((o) => {
+          const on = selected.includes(o)
+          return (
+            <Button
+              key={o}
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-pressed={on}
+              className={cn('rounded-full', on && 'border-primary bg-primary/10 text-primary')}
+              onClick={() => setSelected(on ? selected.filter((s) => s !== o) : [...selected, o])}
+            >
+              {on && <Check />}
+              {o}
+            </Button>
+          )
+        })}
+        <Button
+          type="button"
+          size="sm"
+          className="rounded-full"
+          disabled={selected.length === 0}
+          // Ordre du questionnaire, pas celui des clics.
+          onClick={() => onSend(options.filter((o) => selected.includes(o)).join(', '))}
+        >
+          Valider
+        </Button>
+      </fieldset>
+    )
+  }
+
+  const choices =
+    question.type === 'yesno' ? ['Oui', 'Non'] : question.options ? question.options : suggestions
+  if (choices.length === 0) return null
+
+  return (
+    <fieldset className="ml-11 flex flex-wrap gap-2" aria-label="Réponses proposées">
+      {choices.map((c) => (
+        <Button
+          key={c}
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-auto min-h-7 rounded-full py-1 text-left whitespace-normal"
+          onClick={() => onSend(c)}
+        >
+          {c}
+        </Button>
+      ))}
+    </fieldset>
+  )
+}
