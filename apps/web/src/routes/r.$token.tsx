@@ -137,9 +137,31 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
     void send(null)
   }, [])
 
+  // Le fil reste collé en bas tant que le répondant n'est pas remonté le relire : le
+  // contenu grandit aussi après coup (images chargées, réponses proposées qui apparaissent).
+  const stickToBottom = useRef(true)
+  useEffect(() => {
+    const el = scrollRef.current
+    const content = el?.firstElementChild
+    if (!el || !content) return
+    const onScroll = () => {
+      stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    }
+    const observer = new ResizeObserver(() => {
+      if (stickToBottom.current) el.scrollTo({ top: el.scrollHeight })
+    })
+    el.addEventListener('scroll', onScroll, { passive: true })
+    observer.observe(content)
+    return () => {
+      el.removeEventListener('scroll', onScroll)
+      observer.disconnect()
+    }
+  }, [])
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: on suit le contenu du fil.
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+    stickToBottom.current = true
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
   }, [bubbles, waiting, pending])
 
   function onSubmitMessage(e?: React.FormEvent) {
