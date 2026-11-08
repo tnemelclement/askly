@@ -1,5 +1,5 @@
 import type Anthropic from '@anthropic-ai/sdk'
-import type { Db } from '@questionnaire/db'
+import type { Db } from '@askly/db'
 import { z } from 'zod'
 import {
   type Answers,

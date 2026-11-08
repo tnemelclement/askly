@@ -1,9 +1,4 @@
-import {
-  allQuestions,
-  type Form,
-  type RespondentStatus,
-  STATUS_LABELS,
-} from '@questionnaire/api/domain'
+import { allQuestions, type Form, type RespondentStatus, STATUS_LABELS } from '@askly/api/domain'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { ArrowLeft, Copy, Download, Eye, Mail, UserPlus } from 'lucide-react'

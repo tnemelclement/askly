@@ -6,7 +6,7 @@ import {
   formatAnswer,
   missingRequired,
   type Question,
-} from '@questionnaire/api/domain'
+} from '@askly/api/domain'
 import { FileText, Lock, Pencil, Send, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'

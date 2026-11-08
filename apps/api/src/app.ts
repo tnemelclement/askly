@@ -1,10 +1,10 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { PassThrough } from 'node:stream'
 import Anthropic from '@anthropic-ai/sdk'
+import type { Db } from '@askly/db'
 import cookie from '@fastify/cookie'
 import multipart from '@fastify/multipart'
 import fastifyStatic from '@fastify/static'
-import type { Db } from '@questionnaire/db'
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import {

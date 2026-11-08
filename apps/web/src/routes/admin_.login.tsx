@@ -36,8 +36,8 @@ function LoginPage() {
           <div className="mb-2 flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <ClipboardList className="size-4" aria-hidden="true" />
           </div>
-          <CardTitle>Espace administration</CardTitle>
-          <CardDescription>Questionnaires conversationnels</CardDescription>
+          <CardTitle>Askly</CardTitle>
+          <CardDescription>Questionnaires conversationnels · administration</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={submit} className="grid gap-4">

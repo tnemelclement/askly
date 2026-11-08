@@ -1,19 +1,19 @@
 # Postgres local pour le dev et les tests. Strictement local : identifiants de dev,
-# repris dans `.env.example` (`postgresql://questionnaire:questionnaire@localhost:5436/questionnaire`).
+# repris dans `.env.example` (`postgresql://askly:askly@localhost:5436/askly`).
 services:
   postgres:
     image: postgres:18-alpine
-    container_name: questionnaire-postgres
+    container_name: askly-postgres
     environment:
-      POSTGRES_USER: questionnaire
-      POSTGRES_PASSWORD: questionnaire
-      POSTGRES_DB: questionnaire
+      POSTGRES_USER: askly
+      POSTGRES_PASSWORD: askly
+      POSTGRES_DB: askly
     ports:
       - "5436:5432"
     volumes:
-      - questionnaire-pgdata:/var/lib/postgresql
+      - askly-pgdata:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U questionnaire"]
+      test: ["CMD-SHELL", "pg_isready -U askly"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -22,17 +22,17 @@ services:
   # Le bucket est créé par l'API au démarrage (S3_CREATE_BUCKET=true). En production : un vrai S3.
   s3:
     image: rustfs/rustfs:latest
-    container_name: questionnaire-s3
+    container_name: askly-s3
     environment:
-      RUSTFS_ACCESS_KEY: questionnaire
-      RUSTFS_SECRET_KEY: questionnaire
+      RUSTFS_ACCESS_KEY: askly
+      RUSTFS_SECRET_KEY: askly
       RUSTFS_VOLUMES: /data
       RUSTFS_ADDRESS: ":9000"
     ports:
       - "9100:9000"
     volumes:
-      - questionnaire-s3data:/data
+      - askly-s3data:/data
 
 volumes:
-  questionnaire-pgdata:
-  questionnaire-s3data:
+  askly-pgdata:
+  askly-s3data:

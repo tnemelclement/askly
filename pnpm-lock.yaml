@@ -181,6 +181,9 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^1.6.0
         version: 1.6.0(zod@4.6.7)
+      '@askly/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@aws-sdk/client-s3':
         specifier: ^3.1164.0
         version: 3.1164.0
@@ -199,9 +202,6 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.32.2
         version: 1.32.2(zod@4.6.7)
-      '@questionnaire/db':
-        specifier: workspace:*
-        version: link:../../packages/db
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(@opentelemetry/api@1.10.0)(postgres@3.4.9)
@@ -233,12 +233,12 @@ importers:
 
   apps/web:
     dependencies:
+      '@askly/api':
+        specifier: workspace:*
+        version: link:../api
       '@fontsource-variable/geist':
         specifier: ^5.3.0
         version: 5.3.0
-      '@questionnaire/api':
-        specifier: workspace:*
-        version: link:../api
       '@tanstack/react-query':
         specifier: 5.102.8
         version: 5.102.8(react@19.2.8)

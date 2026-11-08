@@ -1,4 +1,4 @@
-import { answers, type Db, messages, respondents } from '@questionnaire/db'
+import { answers, type Db, messages, respondents } from '@askly/db'
 import { and, asc, eq, sql } from 'drizzle-orm'
 import type { Answers, AnswerValue } from './domain.ts'
 

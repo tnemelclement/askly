@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
-import { answers, type Db, files } from '@questionnaire/db'
+import { answers, type Db, files } from '@askly/db'
 import { and, eq, inArray } from 'drizzle-orm'
 import {
   type AnswerValue,

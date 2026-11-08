@@ -115,7 +115,7 @@ function loginPage(params: z.infer<typeof authorizeQuery>, clientName: string, e
     )
     .join('')
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1"><title>Autoriser l'accès</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Autoriser l'accès à Askly</title>
 <style>
 body{margin:0;min-height:100dvh;display:grid;place-items:center;background:#f4f4f4;color:#0b0b0c;font:15px/1.55 "Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
 main{width:min(380px,calc(100vw - 32px));background:#fff;border:1px solid #e6e6e3;border-radius:11px;padding:28px;box-shadow:0 1px 2px #0000000a,0 4px 16px #0000000a}
@@ -127,7 +127,7 @@ button{margin-top:16px;width:100%;height:40px;border:0;border-radius:8px;backgro
 button:hover{opacity:.85}.error{color:#c4321f;font-size:13px;margin:8px 0 0}
 </style></head><body><main>
 <h1>Autoriser ${escapeHtml(clientName)}</h1>
-<p>Accès complet à vos questionnaires : création, liens, réponses.</p>
+<p>Accès complet à vos questionnaires Askly : création, liens, réponses.</p>
 <form method="post" action="/oauth/authorize">${hidden}
 <label for="password">Mot de passe administrateur</label>
 <input id="password" name="password" type="password" autocomplete="current-password" autofocus required>

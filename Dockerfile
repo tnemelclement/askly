@@ -8,8 +8,8 @@ FROM node:24-slim AS build
 WORKDIR /app
 RUN corepack enable
 COPY . .
-RUN pnpm install --frozen-lockfile --filter "@questionnaire/web..."
-RUN pnpm --filter @questionnaire/web build
+RUN pnpm install --frozen-lockfile --filter "@askly/web..."
+RUN pnpm --filter @askly/web build
 
 # Dépendances de production de l'API seulement, dans une étape vierge : ni Vite, ni Biome,
 # ni Turbo, ni le compilateur dans l'image.
@@ -17,7 +17,7 @@ FROM node:24-slim AS deps
 WORKDIR /app
 RUN corepack enable
 COPY . .
-RUN pnpm install --frozen-lockfile --prod --ignore-scripts --filter "@questionnaire/api..."
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts --filter "@askly/api..."
 
 FROM node:24-slim AS runtime
 ENV NODE_ENV=production \

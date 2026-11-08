@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 /**
  * Domaine pur (sans Node) : format d'un questionnaire, validation des réponses, mise en
- * forme. Partagé avec le front (`@questionnaire/api/domain`).
+ * forme. Partagé avec le front (`@askly/api/domain`).
  */
 
 export const QUESTION_TYPES = [

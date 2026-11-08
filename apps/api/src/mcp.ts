@@ -1,6 +1,6 @@
+import type { Db } from '@askly/db'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
-import type { Db } from '@questionnaire/db'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import {
@@ -36,7 +36,7 @@ import { IMAGE_TYPES, type Storage } from './storage.ts'
  * Authentification : jeton OAuth (connecteur claude.ai) ou ADMIN_API_TOKEN (Claude Code).
  */
 
-const INSTRUCTIONS = `Conversational questionnaires hosted on ask.tnemelc.fr. A respondent opens their personal link and answers in a chat: an AI asks the questions one by one, explains them when asked, offers one-click answers and fills a side panel; they finally click "Send my answers", which locks the answers (status "done").
+const INSTRUCTIONS = `Askly: conversational questionnaires hosted on ask.tnemelc.fr. A respondent opens their personal link and answers in a chat: an AI asks the questions one by one, explains them when asked, offers one-click answers and fills a side panel; they finally click "Send my answers", which locks the answers (status "done").
 
 Two kinds of questionnaires:
 - one-shot (reusable: false): written for a single person, e.g. questions about a client's project. Create the form, then one respondent.
@@ -92,10 +92,7 @@ export function buildMcpServer(db: Db, origin: string, storage?: Storage): McpSe
       }),
     )
 
-  const server = new McpServer(
-    { name: 'questionnaire', version: '1.0.0' },
-    { instructions: INSTRUCTIONS },
-  )
+  const server = new McpServer({ name: 'askly', version: '1.0.0' }, { instructions: INSTRUCTIONS })
 
   server.registerTool(
     'list_forms',

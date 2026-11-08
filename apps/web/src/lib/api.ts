@@ -1,4 +1,4 @@
-import type { Answers, ChatEvent } from '@questionnaire/api/domain'
+import type { Answers, ChatEvent } from '@askly/api/domain'
 
 export type { ChatEvent }
 

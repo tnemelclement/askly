@@ -1,5 +1,5 @@
 {
-  "name": "questionnaire",
+  "name": "askly",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@12.18.0",
@@ -13,8 +13,8 @@
     "lint:fix": "biome check --write .",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "db:generate": "pnpm --filter @questionnaire/db generate",
-    "db:migrate": "pnpm --filter @questionnaire/db migrate"
+    "db:generate": "pnpm --filter @askly/db generate",
+    "db:migrate": "pnpm --filter @askly/db migrate"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.10",

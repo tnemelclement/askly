@@ -1,4 +1,4 @@
-import type { Question } from '@questionnaire/api/domain'
+import type { Question } from '@askly/api/domain'
 import { Check } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'

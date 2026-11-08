@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { createDb } from '@questionnaire/db'
+import { createDb } from '@askly/db'
 import { z } from 'zod'
 import { buildApp } from './app.ts'
 import { seedForms } from './forms.ts'

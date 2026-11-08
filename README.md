@@ -1,4 +1,4 @@
-# questionnaire
+# Askly
 
 Questionnaires conversationnels assistés par IA. Le client ouvre son lien `/r/<token>` et
 répond dans un chat : l'assistant pose les questions une à une, explique quand on lui
@@ -27,7 +27,7 @@ pnpm dev                    # API sur :3400, front sur http://localhost:5190
 Les questionnaires vivent en base. Deux sortes : **réutilisable** (plusieurs personnes, un
 lien chacune) ou **ponctuel** (`reusable: false`, écrit pour une seule personne).
 
-Le plus simple : demander à Claude (skill `questionnaire` des dotfiles), par exemple
+Le plus simple : demander à Claude (skill `askly` des dotfiles, ou serveur MCP `askly`), par exemple
 « fais-moi un questionnaire pour Dupont sur son projet de cuisine ». Il rédige les questions,
 les publie et renvoie le lien à transmettre. Sous le capot, deux appels authentifiés par
 `ADMIN_API_TOKEN` :
@@ -49,7 +49,7 @@ curl -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
 `get_answers`, `set_answer`. Code : `apps/api/src/mcp.ts`.
 
 - **Claude Code** : jeton d'API en en-tête.
-  `claude mcp add --transport http -s user questionnaire https://ask.tnemelc.fr/mcp -H 'Authorization: Bearer ${PERSO_QUESTIONNAIRE_API_TOKEN}'`
+  `claude mcp add --transport http -s user askly https://ask.tnemelc.fr/mcp -H 'Authorization: Bearer ${PERSO_ASKLY_API_TOKEN}'`
 - **claude.ai** (web et mobile) : Réglages → Connecteurs → Ajouter un connecteur
   personnalisé, adresse `https://ask.tnemelc.fr/mcp`. La connexion passe par OAuth : une page
   demande le mot de passe admin (`apps/api/src/oauth.ts`). Changer `ADMIN_PASSWORD` révoque
@@ -64,14 +64,14 @@ Vérifications : `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`.
 ## Déploiement
 
 En production sur https://ask.tnemelc.fr, via Dokploy (`admn.tnemelc.fr`, projet
-`questionnaire`) : une seule image (`Dockerfile` racine, l'API sert aussi le front),
+`askly`) : une seule image (`Dockerfile` racine, l'API sert aussi le front),
 Postgres 18 à côté, migrations au démarrage. Chaque push sur `main` qui touche `apps/`,
 `packages/`, `forms/` ou le `Dockerfile` redéploie. Créer un questionnaire, lui, ne demande aucun
 push : voir « Créer un questionnaire ».
 
 Les variables de prod (`DATABASE_URL`, `ANTHROPIC_API_KEY`, `ADMIN_PASSWORD`,
 `ADMIN_API_TOKEN`, `PUBLIC_URL`, `NODE_ENV=production`) sont dans Dokploy ; copie des
-secrets dans le coffre iCloud (`Secrets/repos/questionnaire/.env.production`).
+secrets dans le coffre iCloud (`Secrets/repos/askly/.env.production`).
 
 ## Variables d'environnement (`.env` à la racine, jamais versionné)
 

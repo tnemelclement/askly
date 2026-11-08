@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { answers, type Db, forms, respondents } from '@questionnaire/db'
+import { answers, type Db, forms, respondents } from '@askly/db'
 import { and, count, desc, eq } from 'drizzle-orm'
 import { visibleMessages } from './ai.ts'
 import {

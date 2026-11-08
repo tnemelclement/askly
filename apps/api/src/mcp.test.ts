@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import type Anthropic from '@anthropic-ai/sdk'
-import type { Db } from '@questionnaire/db'
+import type { Db } from '@askly/db'
 import { describe, expect, it } from 'vitest'
 import { buildApp } from './app.ts'
 import { isPrivateAddress } from './files.ts'

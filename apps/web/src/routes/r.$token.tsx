@@ -1,5 +1,5 @@
-import type { Answers, AnswerValue, Form } from '@questionnaire/api/domain'
-import { allQuestions } from '@questionnaire/api/domain'
+import type { Answers, AnswerValue, Form } from '@askly/api/domain'
+import { allQuestions } from '@askly/api/domain'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { ArrowUp } from 'lucide-react'

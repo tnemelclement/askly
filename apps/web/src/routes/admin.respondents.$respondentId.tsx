@@ -4,7 +4,7 @@ import {
   formatAnswer,
   type RespondentStatus,
   STATUS_LABELS,
-} from '@questionnaire/api/domain'
+} from '@askly/api/domain'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { ArrowLeft, Paperclip } from 'lucide-react'

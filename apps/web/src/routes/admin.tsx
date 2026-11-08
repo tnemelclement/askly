@@ -24,7 +24,7 @@ function AdminLayout() {
             <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <ClipboardList className="size-4" aria-hidden="true" />
             </span>
-            Questionnaires
+            Askly
           </Link>
           <Button
             variant="ghost"
