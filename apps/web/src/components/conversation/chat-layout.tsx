@@ -38,68 +38,71 @@ export function ChatLayout({
   }, [panelOpen])
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-background">
-      <header className="flex shrink-0 items-center justify-between gap-3 border-b bg-background/80 px-4 py-3 backdrop-blur-2xl backdrop-saturate-150 sm:px-6">
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <ClipboardList className="size-4" aria-hidden="true" />
-          </div>
-          <h1 className="truncate font-semibold">{title}</h1>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="xl:hidden"
-          aria-expanded={panelOpen}
-          aria-controls={panelId}
-          onClick={() => setPanelOpen((open) => !open)}
-        >
-          {panelOpen ? <PanelRightClose /> : <PanelRightOpen />}
-          <span className="hidden sm:inline">Vos réponses</span>
-          <span className="text-muted-foreground sm:before:content-['·_']">{panelSummary}</span>
-        </Button>
-      </header>
-
-      <div className="relative flex min-h-0 flex-1">
-        <div className="flex min-w-0 flex-1 flex-col">
-          {/* `relative` : bloc conteneur des `sr-only`, sinon ils font déborder la racine. */}
-          <main
-            ref={scrollRef}
-            className="relative min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-8"
-          >
-            <div className="mx-auto max-w-2xl">{children}</div>
-          </main>
-          {composer && (
-            <div className="shrink-0 bg-background px-3 pt-2 pb-3 sm:px-6 sm:pb-4">
-              <div className="mx-auto max-w-2xl">{composer}</div>
+    // Fenêtre posée sur un fond (dès la tablette) : un questionnaire, pas une application.
+    <div className="h-dvh bg-muted sm:p-6">
+      <div className="flex h-full flex-col overflow-hidden bg-background sm:rounded-xl sm:border sm:shadow-lg">
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b bg-background/80 px-4 py-3 backdrop-blur-2xl backdrop-saturate-150 sm:px-6">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <ClipboardList className="size-4" aria-hidden="true" />
             </div>
-          )}
-        </div>
-
-        {panelOpen && (
-          // Voile sur le fil : un tap à côté referme le panneau.
-          <button
+            <h1 className="truncate font-semibold">{title}</h1>
+          </div>
+          <Button
             type="button"
-            aria-label="Fermer le panneau"
-            className="absolute inset-0 z-10 bg-foreground/20 xl:hidden"
-            onClick={() => setPanelOpen(false)}
-          />
-        )}
+            variant="outline"
+            size="sm"
+            className="xl:hidden"
+            aria-expanded={panelOpen}
+            aria-controls={panelId}
+            onClick={() => setPanelOpen((open) => !open)}
+          >
+            {panelOpen ? <PanelRightClose /> : <PanelRightOpen />}
+            <span className="hidden sm:inline">Vos réponses</span>
+            <span className="text-muted-foreground sm:before:content-['·_']">{panelSummary}</span>
+          </Button>
+        </header>
 
-        <aside
-          id={panelId}
-          aria-label="Vos réponses"
-          className={cn(
-            'w-[360px] shrink-0 border-l bg-secondary',
-            panelOpen
-              ? 'absolute inset-y-0 right-0 z-20 block w-[min(360px,92vw)] bg-background shadow-xl'
-              : 'hidden',
-            'xl:static xl:block xl:bg-secondary xl:shadow-none',
+        <div className="relative flex min-h-0 flex-1">
+          <div className="flex min-w-0 flex-1 flex-col">
+            {/* `relative` : bloc conteneur des `sr-only`, sinon ils font déborder la racine. */}
+            <main
+              ref={scrollRef}
+              className="relative min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-8"
+            >
+              <div className="mx-auto max-w-2xl">{children}</div>
+            </main>
+            {composer && (
+              <div className="shrink-0 bg-background px-3 pt-2 pb-3 sm:px-6 sm:pb-4">
+                <div className="mx-auto max-w-2xl">{composer}</div>
+              </div>
+            )}
+          </div>
+
+          {panelOpen && (
+            // Voile sur le fil : un tap à côté referme le panneau.
+            <button
+              type="button"
+              aria-label="Fermer le panneau"
+              className="absolute inset-0 z-10 bg-foreground/20 xl:hidden"
+              onClick={() => setPanelOpen(false)}
+            />
           )}
-        >
-          {panel}
-        </aside>
+
+          <aside
+            id={panelId}
+            aria-label="Vos réponses"
+            className={cn(
+              'w-[360px] shrink-0 border-l bg-secondary',
+              panelOpen
+                ? 'absolute inset-y-0 right-0 z-20 block w-[min(360px,92vw)] bg-background shadow-xl'
+                : 'hidden',
+              'xl:static xl:block xl:bg-secondary xl:shadow-none',
+            )}
+          >
+            {panel}
+          </aside>
+        </div>
       </div>
     </div>
   )
