@@ -6,10 +6,11 @@ import { answers, type Db, respondents } from '@questionnaire/db'
 import { count, desc, eq } from 'drizzle-orm'
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify'
 import { z } from 'zod'
-import { type ChatEvent, runTurn, visibleMessages } from './ai.ts'
+import { runTurn, visibleMessages } from './ai.ts'
 import {
   type Answers,
   allQuestions,
+  type ChatEvent,
   type Form,
   formatAnswer,
   missingRequired,

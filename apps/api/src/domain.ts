@@ -55,6 +55,14 @@ export type Form = FormDefinition & { id: string }
 export type AnswerValue = string | number | boolean | string[]
 export type Answers = Record<string, AnswerValue>
 
+/** Événements du flux NDJSON de `POST /api/r/:token/chat`, un par ligne. */
+export type ChatEvent =
+  | { type: 'message_start' }
+  | { type: 'text'; text: string }
+  | { type: 'answer'; questionId: string; value: AnswerValue }
+  | { type: 'error'; message: string }
+  | { type: 'done' }
+
 export function allQuestions(form: FormDefinition): Question[] {
   return form.sections.flatMap((s) => s.questions)
 }

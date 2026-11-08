@@ -3,8 +3,8 @@ import type { Db } from '@questionnaire/db'
 import { z } from 'zod'
 import {
   type Answers,
-  type AnswerValue,
   allQuestions,
+  type ChatEvent,
   type Form,
   formatAnswer,
   missingRequired,
@@ -32,13 +32,6 @@ export const AI_MODEL = 'claude-haiku-5-5'
 export const RECORD_ANSWER_TOOL = 'record_answer'
 /** Garde-fou contre une boucle d'outils sans fin dans un même tour. */
 const MAX_STEPS = 6
-
-export type ChatEvent =
-  | { type: 'message_start' }
-  | { type: 'text'; text: string }
-  | { type: 'answer'; questionId: string; value: AnswerValue }
-  | { type: 'error'; message: string }
-  | { type: 'done' }
 
 const TYPE_HINTS: Record<Question['type'], string> = {
   text: 'texte court (chaîne)',
