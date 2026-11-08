@@ -225,11 +225,12 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
 
   if (locked) {
     return (
-      <div className="flex h-dvh flex-col items-center justify-center gap-4 p-6 text-center">
-        <CircleCheck className="size-16 text-primary" aria-hidden />
-        <p className="text-lg font-medium">
-          Vos réponses ont été envoyées. Merci {initial.respondent.name} !
-        </p>
+      // Même fenêtre que le chat (voir ChatLayout).
+      <div className="h-dvh bg-muted sm:p-6">
+        <div className="mx-auto flex h-full max-w-6xl flex-col items-center justify-center gap-4 overflow-hidden bg-background p-6 text-center sm:rounded-xl sm:border sm:shadow-lg">
+          <CircleCheck className="size-16 text-primary" aria-hidden />
+          <p className="text-lg font-medium">Vos réponses ont été envoyées. Merci !</p>
+        </div>
       </div>
     )
   }
