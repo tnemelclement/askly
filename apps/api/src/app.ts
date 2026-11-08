@@ -299,7 +299,10 @@ export function buildApp({ db, anthropic, adminPassword, logger = false }: AppOp
         r.email,
         STATUS_LABELS[respondentStatus(r)],
         r.submittedAt?.toISOString() ?? '',
-        ...questions.map((q) => formatAnswer(q, a[q.id])),
+        // Nombres bruts : un tableur les lit comme des nombres, pas comme du texte « 3 000 ».
+        ...questions.map((q) =>
+          q.type === 'number' ? String(a[q.id] ?? '') : formatAnswer(q, a[q.id]),
+        ),
       ]
     })
     // BOM : Excel ouvre alors le fichier en UTF-8 (accents intacts).
