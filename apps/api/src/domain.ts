@@ -1,0 +1,158 @@
+import { z } from 'zod'
+
+/**
+ * Domaine pur (sans Node) : format d'un questionnaire, validation des réponses, mise en
+ * forme. Partagé avec le front (`@questionnaire/api/domain`).
+ */
+
+export const QUESTION_TYPES = [
+  'text',
+  'longtext',
+  'choice',
+  'multichoice',
+  'number',
+  'date',
+  'yesno',
+] as const
+export type QuestionType = (typeof QUESTION_TYPES)[number]
+
+const questionSchema = z
+  .strictObject({
+    id: z.string().regex(/^[a-z0-9_]+$/, 'id en minuscules, chiffres et _'),
+    label: z.string().min(1),
+    help: z.string().optional(),
+    type: z.enum(QUESTION_TYPES),
+    options: z.array(z.string().min(1)).min(2).optional(),
+    required: z.boolean().default(true),
+  })
+  .refine((q) => (q.type === 'choice' || q.type === 'multichoice') === Boolean(q.options), {
+    message: '`options` est requis pour choice/multichoice, et interdit pour les autres types',
+  })
+
+export const formSchema = z
+  .strictObject({
+    title: z.string().min(1),
+    intro: z.string().min(1),
+    context: z.string().optional(),
+    sections: z
+      .array(
+        z.strictObject({ title: z.string().min(1), questions: z.array(questionSchema).min(1) }),
+      )
+      .min(1),
+  })
+  .superRefine((form, ctx) => {
+    const seen = new Set<string>()
+    for (const q of form.sections.flatMap((s) => s.questions)) {
+      if (seen.has(q.id)) ctx.addIssue({ code: 'custom', message: `id en double : ${q.id}` })
+      seen.add(q.id)
+    }
+  })
+
+export type FormDefinition = z.infer<typeof formSchema>
+export type Question = FormDefinition['sections'][number]['questions'][number]
+export type Form = FormDefinition & { id: string }
+
+export type AnswerValue = string | number | boolean | string[]
+export type Answers = Record<string, AnswerValue>
+
+export function allQuestions(form: FormDefinition): Question[] {
+  return form.sections.flatMap((s) => s.questions)
+}
+
+type Result = { ok: true; value: AnswerValue } | { ok: false; error: string }
+
+const MAX_LENGTH = { text: 500, longtext: 5000 } as const
+
+function validateValue(q: Question, raw: unknown): Result {
+  const fail = (error: string): Result => ({ ok: false, error })
+  switch (q.type) {
+    case 'text':
+    case 'longtext': {
+      if (typeof raw !== 'string' || !raw.trim()) return fail('texte non vide attendu')
+      if (raw.length > MAX_LENGTH[q.type]) return fail(`${MAX_LENGTH[q.type]} caractères maximum`)
+      return { ok: true, value: raw.trim() }
+    }
+    case 'number': {
+      const n =
+        typeof raw === 'number'
+          ? raw
+          : typeof raw === 'string' && raw.trim()
+            ? Number(raw.replace(/\s/g, '').replace(',', '.'))
+            : Number.NaN
+      return Number.isFinite(n) ? { ok: true, value: n } : fail('nombre attendu')
+    }
+    case 'date': {
+      if (typeof raw !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        return fail('date au format AAAA-MM-JJ attendue')
+      }
+      // `2025-02-30` passe la regex mais Date le décale au 2 mars : on le refuse.
+      const d = new Date(`${raw}T00:00:00Z`)
+      return !Number.isNaN(d.getTime()) && d.toISOString().startsWith(raw)
+        ? { ok: true, value: raw }
+        : fail('date inexistante')
+    }
+    case 'yesno':
+      return typeof raw === 'boolean' ? { ok: true, value: raw } : fail('true ou false attendu')
+    case 'choice':
+      return typeof raw === 'string' && q.options?.includes(raw)
+        ? { ok: true, value: raw }
+        : fail(`une option parmi : ${q.options?.join(' | ')}`)
+    case 'multichoice': {
+      if (!Array.isArray(raw) || raw.length === 0) return fail("liste d'options non vide attendue")
+      const unknown = raw.filter((v) => typeof v !== 'string' || !q.options?.includes(v))
+      if (unknown.length) {
+        return fail(
+          `options inconnues : ${unknown.join(', ')} (valides : ${q.options?.join(' | ')})`,
+        )
+      }
+      // Ordre du questionnaire, sans doublon.
+      return { ok: true, value: (q.options ?? []).filter((o) => raw.includes(o)) }
+    }
+  }
+}
+
+/** Valide une réponse (outil de l'IA ou correction manuelle) ; refuse les ids inconnus. */
+export function validateAnswer(
+  form: FormDefinition,
+  questionId: string,
+  raw: unknown,
+): { ok: true; question: Question; value: AnswerValue } | { ok: false; error: string } {
+  const question = allQuestions(form).find((q) => q.id === questionId)
+  if (!question) return { ok: false, error: `question inconnue : ${questionId}` }
+  const result = validateValue(question, raw)
+  return result.ok
+    ? { ok: true, question, value: result.value }
+    : { ok: false, error: `${questionId} : ${result.error}` }
+}
+
+/** Valeur lisible (panneau, export CSV, retour à l'IA). */
+export function formatAnswer(q: Question, value: AnswerValue | undefined): string {
+  if (value === undefined) return ''
+  if (q.type === 'yesno') return value ? 'Oui' : 'Non'
+  if (q.type === 'date' && typeof value === 'string') {
+    return new Date(`${value}T00:00:00Z`).toLocaleDateString('fr-FR', { timeZone: 'UTC' })
+  }
+  if (Array.isArray(value)) return value.join(', ')
+  if (typeof value === 'number') return value.toLocaleString('fr-FR')
+  return String(value)
+}
+
+export function missingRequired(form: FormDefinition, answers: Answers): Question[] {
+  return allQuestions(form).filter((q) => q.required && answers[q.id] === undefined)
+}
+
+export type RespondentStatus = 'not_started' | 'in_progress' | 'done'
+
+export const STATUS_LABELS: Record<RespondentStatus, string> = {
+  not_started: 'Pas commencé',
+  in_progress: 'En cours',
+  done: 'Terminé',
+}
+
+export function respondentStatus(r: {
+  startedAt: Date | string | null
+  submittedAt: Date | string | null
+}): RespondentStatus {
+  if (r.submittedAt) return 'done'
+  return r.startedAt ? 'in_progress' : 'not_started'
+}

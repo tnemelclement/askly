@@ -1,0 +1,62 @@
+import { sql } from 'drizzle-orm'
+import {
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core'
+
+/**
+ * Un répondant = une personne invitée à remplir un questionnaire (`forms/<formId>.yaml`),
+ * avec son propre lien `/r/<token>`. Statut dérivé : `submittedAt` → terminé,
+ * `startedAt` → en cours, sinon pas commencé.
+ */
+export const respondents = pgTable('respondents', {
+  id: uuid().primaryKey().default(sql`gen_random_uuid()`),
+  token: text().notNull().unique(),
+  formId: text().notNull(),
+  name: text().notNull(),
+  email: text().notNull(),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  startedAt: timestamp({ withTimezone: true }),
+  submittedAt: timestamp({ withTimezone: true }),
+})
+
+/** Réponse validée à une question ; `source` dit si elle vient de l'IA ou d'une correction. */
+export const answers = pgTable(
+  'answers',
+  {
+    respondentId: uuid()
+      .notNull()
+      .references(() => respondents.id, { onDelete: 'cascade' }),
+    questionId: text().notNull(),
+    value: jsonb().$type<string | number | boolean | string[]>().notNull(),
+    source: text({ enum: ['ai', 'manual'] }).notNull(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.respondentId, t.questionId] })],
+)
+
+/**
+ * Historique de la conversation, en ajout seul. `content` = blocs de l'API Anthropic tels
+ * quels (thinking, tool_use, tool_result compris) pour rejouer l'échange à l'identique ;
+ * `display` = texte montré au répondant, `null` pour un message technique.
+ */
+export const messages = pgTable(
+  'messages',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    respondentId: uuid()
+      .notNull()
+      .references(() => respondents.id, { onDelete: 'cascade' }),
+    role: text({ enum: ['user', 'assistant'] }).notNull(),
+    content: jsonb().$type<unknown[]>().notNull(),
+    display: text(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.respondentId, t.id)],
+)

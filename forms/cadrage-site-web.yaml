@@ -1,0 +1,77 @@
+# Questionnaire de cadrage avant la création d'un site internet.
+# Format décrit dans le README (§ Format des questionnaires).
+title: Cadrage de votre futur site internet
+intro: >
+  Quelques questions pour bien comprendre votre activité et vos attentes avant de
+  concevoir votre site. Comptez une dizaine de minutes ; vous pouvez vous arrêter et
+  reprendre plus tard avec le même lien.
+context: >
+  Le répondant est un client (TPE, artisan, commerçant, profession libérale) qui veut
+  un site vitrine ou un petit site de vente. Il n'est pas technicien : évitez le jargon
+  (SEO, CMS, nom de domaine…) ou expliquez-le simplement avec un exemple. Les réponses
+  serviront à préparer un devis et une maquette.
+
+sections:
+  - title: Votre activité
+    questions:
+      - id: entreprise
+        label: Nom de votre entreprise
+        type: text
+      - id: activite
+        label: Décrivez votre activité en quelques phrases
+        type: longtext
+        help: Ce que vous vendez ou proposez, à qui, et ce qui vous distingue de vos concurrents.
+      - id: date_creation
+        label: Date de création de l'entreprise
+        type: date
+        required: false
+        help: Une date approximative suffit (le 1er du mois ou de l'année si le client ne sait plus).
+
+  - title: Le site
+    questions:
+      - id: objectif
+        label: Objectif principal du site
+        type: choice
+        options:
+          - Présenter mon activité
+          - Obtenir des demandes de devis ou de contact
+          - Vendre en ligne
+          - Prendre des rendez-vous
+        help: S'il en cite plusieurs, lui demander lequel compte le plus.
+      - id: pages
+        label: Rubriques souhaitées
+        type: multichoice
+        options:
+          - Accueil
+          - Présentation / À propos
+          - Services ou produits
+          - Réalisations / Galerie
+          - Tarifs
+          - Blog / Actualités
+          - Contact
+        help: Proposer la liste ; il peut en choisir plusieurs. Accueil et Contact sont presque toujours utiles.
+      - id: site_existant
+        label: Avez-vous déjà un site internet ?
+        type: yesno
+      - id: nom_domaine
+        label: Possédez-vous déjà un nom de domaine ?
+        type: yesno
+        help: >
+          Le nom de domaine est l'adresse du site (ex. boulangerie-martin.fr). S'il a déjà
+          un site ou une adresse e-mail à son nom (contact@son-entreprise.fr), c'est
+          probablement oui.
+
+  - title: Budget et délais
+    questions:
+      - id: budget
+        label: Budget envisagé (en euros HT)
+        type: number
+        help: Un ordre de grandeur suffit. S'il ne sait pas, indiquer qu'un site vitrine simple démarre autour de 1 500 € HT.
+      - id: date_souhaitee
+        label: Date de mise en ligne souhaitée
+        type: date
+      - id: remarques
+        label: Autre chose à nous dire ?
+        type: longtext
+        required: false
+        help: Sites qu'il aime, contraintes, couleurs, logo existant…

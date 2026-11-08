@@ -1,0 +1,22 @@
+# Postgres local pour le dev et les tests. Strictement local : identifiants de dev,
+# repris dans `.env.example` (`postgresql://questionnaire:questionnaire@localhost:5436/questionnaire`).
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: questionnaire-postgres
+    environment:
+      POSTGRES_USER: questionnaire
+      POSTGRES_PASSWORD: questionnaire
+      POSTGRES_DB: questionnaire
+    ports:
+      - "5436:5432"
+    volumes:
+      - questionnaire-pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U questionnaire"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  questionnaire-pgdata:
