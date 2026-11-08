@@ -187,7 +187,7 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
         ) : (
           <form
             onSubmit={onSubmitMessage}
-            className="flex items-end gap-2 rounded-[26px] border bg-background p-1.5 pl-2 shadow-soft transition-colors focus-within:border-foreground"
+            className="flex items-end gap-2 rounded-xl border bg-background p-1.5 pl-2 shadow-soft transition-colors focus-within:border-foreground"
           >
             <label htmlFor="message" className="sr-only">
               Votre message
