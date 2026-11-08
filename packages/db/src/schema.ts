@@ -76,3 +76,24 @@ export const messages = pgTable(
   },
   (t) => [index().on(t.respondentId, t.id)],
 )
+
+/**
+ * Fichier stocké sur S3 : image d'un questionnaire (`image`, envoyée par l'admin ou le MCP)
+ * ou fichier joint par un répondant à une question de type `file` (`upload`). La réponse
+ * à cette question contient les id des fichiers.
+ */
+export const files = pgTable(
+  'files',
+  {
+    id: uuid().primaryKey().default(sql`gen_random_uuid()`),
+    kind: text({ enum: ['image', 'upload'] }).notNull(),
+    respondentId: uuid().references(() => respondents.id, { onDelete: 'cascade' }),
+    questionId: text(),
+    key: text().notNull(),
+    filename: text().notNull(),
+    contentType: text().notNull(),
+    size: integer().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.respondentId)],
+)

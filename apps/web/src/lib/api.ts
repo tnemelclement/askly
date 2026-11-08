@@ -1,4 +1,4 @@
-import type { ChatEvent } from '@questionnaire/api/domain'
+import type { Answers, ChatEvent } from '@questionnaire/api/domain'
 
 export type { ChatEvent }
 
@@ -53,3 +53,25 @@ export async function streamChat(
     for (const line of lines) if (line.trim()) onEvent(JSON.parse(line) as ChatEvent)
   }
 }
+
+export type FileInfo = { id: string; filename: string; contentType: string; size: number }
+
+/** Joint un fichier à une question `file` (multipart). */
+export async function uploadFile(token: string, questionId: string, file: File) {
+  const body = new FormData()
+  body.append('file', file)
+  const res = await fetch(`/api/r/${token}/files/${questionId}`, { method: 'POST', body })
+  const data = (await res.json().catch(() => null)) as {
+    error?: string
+    file: FileInfo
+    answers: Answers
+    files: Record<string, FileInfo>
+  } | null
+  if (!res.ok || !data) throw new ApiError(res.status, data?.error ?? `Erreur ${res.status}`)
+  return data
+}
+
+/** Formats acceptés à l'envoi (même liste que le serveur), pour le sélecteur de fichiers. */
+export const UPLOAD_ACCEPT =
+  'image/*,application/pdf,.txt,.csv,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.zip'
+export const MAX_UPLOAD_MB = 20

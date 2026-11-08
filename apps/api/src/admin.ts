@@ -11,7 +11,16 @@ import {
   respondentStatus,
   validateAnswer,
 } from './domain.ts'
+import { HttpError } from './errors.ts'
+import {
+  fileInfos,
+  fileNames,
+  keysOfRespondents,
+  respondentFiles,
+  saveFileAnswer,
+} from './files.ts'
 import { getForm, listForms, parseForm, type StoredForm, saveForm } from './forms.ts'
+import type { Storage } from './storage.ts'
 import { loadAnswers, loadMessages, saveAnswer } from './store.ts'
 
 /**
@@ -19,14 +28,7 @@ import { loadAnswers, loadMessages, saveAnswer } from './store.ts'
  * les outils du serveur MCP : mêmes validations des deux côtés.
  */
 
-// Pas de propriété de constructeur : Node exécute ces sources TS en retirant les types, sans transformer.
-export class HttpError extends Error {
-  readonly statusCode: number
-  constructor(statusCode: number, message: string) {
-    super(message)
-    this.statusCode = statusCode
-  }
-}
+export { HttpError }
 
 export async function formOrThrow(db: Db, id: string): Promise<StoredForm> {
   const form = await getForm(db, id)
@@ -100,14 +102,20 @@ export async function putForm(
 }
 
 /** Supprime le questionnaire et ses répondants (réponses et conversations suivent, en cascade). */
-export async function deleteForm(db: Db, id: string) {
+export async function deleteForm(db: Db, storage: Storage | undefined, id: string) {
   const form = await formOrThrow(db, id)
+  const ids = (
+    await db.select({ id: respondents.id }).from(respondents).where(eq(respondents.formId, form.id))
+  ).map((r) => r.id)
+  const keys = await keysOfRespondents(db, ids)
   const deletedRespondents = await db.transaction(async (tx) => {
     const gone = await tx.delete(respondents).where(eq(respondents.formId, form.id)).returning()
     await tx.delete(forms).where(eq(forms.id, form.id))
     return gone.length
   })
-  return { id: form.id, deletedRespondents }
+  // Fichiers joints : les lignes sont parties en cascade, on efface les objets S3.
+  if (keys.length) await storage?.remove(keys)
+  return { id: form.id, deletedRespondents, deletedFiles: keys.length }
 }
 
 export async function createRespondent(
@@ -141,10 +149,12 @@ export async function updateRespondent(
   return { respondentId: r.id, name: r.name, email: r.email, link: linkFor(origin, r.token) }
 }
 
-export async function deleteRespondent(db: Db, id: string) {
+export async function deleteRespondent(db: Db, storage: Storage | undefined, id: string) {
   const r = await respondentOrThrow(db, id)
+  const keys = await keysOfRespondents(db, [id])
   await db.delete(respondents).where(eq(respondents.id, id))
-  return { id, name: r.name }
+  if (keys.length) await storage?.remove(keys)
+  return { id, name: r.name, deletedFiles: keys.length }
 }
 
 /** Rouvre des réponses envoyées : le répondant peut de nouveau discuter et corriger. */
@@ -169,14 +179,35 @@ export async function getRespondentDetail(db: Db, id: string, origin: string) {
     },
     form,
     answers: await loadAnswers(db, respondent.id),
+    files: await fileInfos(db, respondent.id),
     messages: visibleMessages(await loadMessages(db, respondent.id)),
   }
 }
 
 /** Corrige (ou efface, `value: null`) une réponse, avec la même validation que le chat. */
-export async function setAnswer(db: Db, respondentId: string, questionId: string, value: unknown) {
+export async function setAnswer(
+  db: Db,
+  storage: Storage | undefined,
+  respondentId: string,
+  questionId: string,
+  value: unknown,
+) {
   const respondent = await respondentOrThrow(db, respondentId)
   const form = await formOrThrow(db, respondent.formId)
+  const question = allQuestions(form).find((q) => q.id === questionId)
+  if (question?.type === 'file') {
+    // Pour une question `file`, on ne peut que retirer des fichiers (ou tout effacer avec null).
+    const result = value === null ? null : validateAnswer(form, questionId, value)
+    if (result && !result.ok) throw new HttpError(400, result.error)
+    await saveFileAnswer(
+      db,
+      storage,
+      respondentId,
+      questionId,
+      result ? (result.value as string[]) : null,
+    )
+    return { answers: await loadAnswers(db, respondentId) }
+  }
   if (value === null) {
     if (!allQuestions(form).some((q) => q.id === questionId)) {
       throw new HttpError(400, `question inconnue : ${questionId}`)
@@ -202,8 +233,13 @@ export async function exportAnswers(db: Db, form: Form) {
       .innerJoin(respondents, eq(answers.respondentId, respondents.id))
       .where(eq(respondents.formId, form.id))
   ).map((r) => r.a)
+  const filesById = await respondentFiles(
+    db,
+    rows.map((r) => r.id),
+  )
   return rows.map((r) => ({
     respondent: r,
+    files: filesById,
     status: respondentStatus(r),
     answers: Object.fromEntries(
       all.filter((a) => a.respondentId === r.id).map((a) => [a.questionId, a.value]),
@@ -212,11 +248,15 @@ export async function exportAnswers(db: Db, form: Form) {
 }
 
 /** Réponses lisibles, question par question, dans l'ordre du questionnaire. */
-export function readableAnswers(form: Form, a: Record<string, AnswerValue>) {
+export function readableAnswers(
+  form: Form,
+  a: Record<string, AnswerValue>,
+  files: Record<string, { filename: string }> = {},
+) {
   return allQuestions(form).map((q) => ({
     questionId: q.id,
     label: q.label,
     value: a[q.id] ?? null,
-    display: a[q.id] === undefined ? null : formatAnswer(q, a[q.id]),
+    display: a[q.id] === undefined ? null : formatAnswer(q, a[q.id], fileNames(files)),
   }))
 }

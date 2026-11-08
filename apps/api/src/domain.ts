@@ -13,7 +13,18 @@ export const QUESTION_TYPES = [
   'number',
   'date',
   'yesno',
+  'file',
 ] as const
+
+/** Fichiers joints au plus par question `file`, et taille maximale de chacun. */
+export const MAX_FILES_PER_QUESTION = 10
+export const MAX_FILE_SIZE = 20 * 1024 * 1024
+
+/** Image affichée au répondant (adresse renvoyée par `upload_image`, ou toute image en ligne). */
+const imageSchema = z.strictObject({
+  url: z.url({ protocol: /^https?$/ }),
+  alt: z.string().max(300).optional().describe('Description, pour les lecteurs d’écran et l’IA.'),
+})
 export type QuestionType = (typeof QUESTION_TYPES)[number]
 
 const questionSchema = z
@@ -25,13 +36,15 @@ const questionSchema = z
     options: z.array(z.string().min(1)).min(2).optional(),
     /** Réponses proposées en un clic pour une question ouverte (le répondant peut aussi écrire). */
     suggestions: z.array(z.string().min(1).max(200)).min(1).max(6).optional(),
+    /** Illustration montrée avec la question. */
+    image: imageSchema.optional(),
     required: z.boolean().default(true),
   })
   .refine((q) => (q.type === 'choice' || q.type === 'multichoice') === Boolean(q.options), {
     message: '`options` est requis pour choice/multichoice, et interdit pour les autres types',
   })
-  .refine((q) => !(q.suggestions && q.options), {
-    message: '`suggestions` est réservé aux questions sans `options`',
+  .refine((q) => !(q.suggestions && (q.options || q.type === 'file')), {
+    message: '`suggestions` est réservé aux questions sans `options` (ni `file`)',
   })
 
 /** Identifiant d'un questionnaire : il apparaît dans les URL de l'admin. */
@@ -42,6 +55,8 @@ export const formSchema = z
     title: z.string().min(1),
     intro: z.string().min(1),
     context: z.string().optional(),
+    /** Image de couverture, au-dessus de l'introduction. */
+    image: imageSchema.optional(),
     sections: z
       .array(
         z.strictObject({ title: z.string().min(1), questions: z.array(questionSchema).min(1) }),
@@ -125,6 +140,18 @@ function validateValue(q: Question, raw: unknown): Result {
       // Ordre du questionnaire, sans doublon.
       return { ok: true, value: (q.options ?? []).filter((o) => raw.includes(o)) }
     }
+    case 'file': {
+      // Les id des fichiers joints ; le serveur vérifie qu'ils appartiennent au répondant.
+      const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      if (!Array.isArray(raw) || raw.length === 0)
+        return fail('liste de fichiers non vide attendue')
+      if (!raw.every((v) => typeof v === 'string' && uuid.test(v)))
+        return fail('id de fichier attendus')
+      const ids = [...new Set(raw as string[])]
+      return ids.length > MAX_FILES_PER_QUESTION
+        ? fail(`${MAX_FILES_PER_QUESTION} fichiers maximum`)
+        : { ok: true, value: ids }
+    }
   }
 }
 
@@ -143,8 +170,16 @@ export function validateAnswer(
 }
 
 /** Valeur lisible (panneau, export CSV, retour à l'IA). */
-export function formatAnswer(q: Question, value: AnswerValue | undefined): string {
+export function formatAnswer(
+  q: Question,
+  value: AnswerValue | undefined,
+  /** Noms des fichiers joints, par id (questions `file`). */
+  fileNames: Record<string, string> = {},
+): string {
   if (value === undefined) return ''
+  if (q.type === 'file' && Array.isArray(value)) {
+    return value.map((id) => fileNames[id] ?? 'fichier').join(', ')
+  }
   if (q.type === 'yesno') return value ? 'Oui' : 'Non'
   if (q.type === 'date' && typeof value === 'string') {
     return new Date(`${value}T00:00:00Z`).toLocaleDateString('fr-FR', { timeZone: 'UTC' })

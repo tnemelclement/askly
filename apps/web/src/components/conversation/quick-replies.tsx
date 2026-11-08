@@ -2,7 +2,9 @@ import type { Question } from '@questionnaire/api/domain'
 import { Check } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { MAX_UPLOAD_MB } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { FileAttachButton } from './file-attach'
 
 /**
  * Réponses en un clic sous la question en cours : les options d'un choix, Oui / Non, des
@@ -14,12 +16,28 @@ export function QuickReplies({
   question,
   suggestions,
   onSend,
+  onAttach,
+  uploading = false,
 }: {
   question: Question
   suggestions: string[]
   onSend: (text: string) => void
+  /** Question `file` : fichiers choisis par le répondant. */
+  onAttach?: (files: File[]) => void
+  uploading?: boolean
 }) {
   const [selected, setSelected] = useState<string[]>([])
+
+  if (question.type === 'file') {
+    return (
+      <div className="ml-11 flex flex-wrap items-center gap-2">
+        <FileAttachButton variant="default" uploading={uploading} onFiles={(f) => onAttach?.(f)} />
+        <span className="text-xs text-muted-foreground">
+          Photos, PDF ou documents, {MAX_UPLOAD_MB} Mo maximum chacun
+        </span>
+      </div>
+    )
+  }
 
   if (question.type === 'multichoice') {
     const options = question.options ?? []

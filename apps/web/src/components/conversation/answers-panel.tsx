@@ -7,7 +7,7 @@ import {
   missingRequired,
   type Question,
 } from '@questionnaire/api/domain'
-import { Lock, Pencil, Send } from 'lucide-react'
+import { FileText, Lock, Pencil, Send, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -23,8 +23,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Textarea } from '@/components/ui/textarea'
+import type { FileInfo } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { AnimatedCheck } from './animated-check'
+import { FileAttachButton } from './file-attach'
 import { usePrefersReducedMotion, useStaggeredReveal } from './motion'
 
 /**
@@ -40,6 +42,10 @@ export function answersCounterLabel(ready: number, total: number): string {
 export function AnswersPanel({
   form,
   answers,
+  files,
+  fileHref,
+  onAttach,
+  uploading,
   locked,
   onEdit,
   onSubmit,
@@ -47,6 +53,11 @@ export function AnswersPanel({
 }: {
   form: Form
   answers: Answers
+  /** Fichiers joints, par id, et lien pour les retélécharger. */
+  files: Record<string, FileInfo>
+  fileHref: (id: string) => string
+  onAttach: (questionId: string, files: File[]) => Promise<void>
+  uploading: boolean
   locked: boolean
   onEdit: (questionId: string, value: AnswerValue) => Promise<void>
   onSubmit: () => void
@@ -60,6 +71,10 @@ export function AnswersPanel({
   const [editing, setEditing] = useState<Question | null>(null)
   const [announcement, setAnnouncement] = useState('')
   const announced = useRef(new Set(answeredIds))
+  const names = useMemo(
+    () => Object.fromEntries(Object.values(files).map((f) => [f.id, f.filename])),
+    [files],
+  )
 
   useEffect(() => {
     const fresh = allQuestions(form).filter(
@@ -67,8 +82,10 @@ export function AnswersPanel({
     )
     if (fresh.length === 0) return
     for (const q of fresh) announced.current.add(q.id)
-    setAnnouncement(fresh.map((q) => `${q.label} : ${formatAnswer(q, answers[q.id])}`).join(' ; '))
-  }, [form, answers, revealed])
+    setAnnouncement(
+      fresh.map((q) => `${q.label} : ${formatAnswer(q, answers[q.id], names)}`).join(' ; '),
+    )
+  }, [form, answers, revealed, names])
 
   const total = allQuestions(form).length
   const ready = answeredIds.filter((id) => revealed.has(id)).length
@@ -120,7 +137,7 @@ export function AnswersPanel({
                           {state === 'empty' ? (
                             <span className="text-muted-foreground">—</span>
                           ) : (
-                            formatAnswer(q, value)
+                            formatAnswer(q, value, names)
                           )}
                         </span>
                       </span>
@@ -170,7 +187,20 @@ export function AnswersPanel({
         {announcement}
       </p>
 
-      {editing && (
+      {editing?.type === 'file' && (
+        <FilesEditor
+          question={editing}
+          ids={Array.isArray(answers[editing.id]) ? (answers[editing.id] as string[]) : []}
+          files={files}
+          fileHref={fileHref}
+          uploading={uploading}
+          onAttach={(list) => onAttach(editing.id, list)}
+          onRemove={(remaining) => onEdit(editing.id, remaining)}
+          onClose={() => setEditing(null)}
+        />
+      )}
+
+      {editing && editing.type !== 'file' && (
         <AnswerEditor
           question={editing}
           value={answers[editing.id]}
@@ -183,6 +213,100 @@ export function AnswersPanel({
       )}
     </section>
   )
+}
+
+/** Fichiers joints à une question : les voir, en retirer, en ajouter. */
+function FilesEditor({
+  question: q,
+  ids,
+  files,
+  fileHref,
+  uploading,
+  onAttach,
+  onRemove,
+  onClose,
+}: {
+  question: Question
+  ids: string[]
+  files: Record<string, FileInfo>
+  fileHref: (id: string) => string
+  uploading: boolean
+  onAttach: (files: File[]) => Promise<void>
+  onRemove: (remaining: string[]) => Promise<void>
+  onClose: () => void
+}) {
+  const [error, setError] = useState<string | null>(null)
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Vos fichiers</DialogTitle>
+          <DialogDescription>{q.label}</DialogDescription>
+        </DialogHeader>
+        {ids.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Aucun fichier pour l’instant.</p>
+        ) : (
+          <ul className="divide-y rounded-lg border">
+            {ids.map((id) => (
+              <li key={id} className="flex items-center gap-3 px-3 py-2">
+                <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <a
+                  href={fileHref(id)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="min-w-0 flex-1 truncate text-sm underline-offset-4 hover:underline"
+                >
+                  {files[id]?.filename ?? 'fichier'}
+                </a>
+                {files[id] && (
+                  <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                    {formatSize(files[id].size)}
+                  </span>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Retirer ${files[id]?.filename ?? 'ce fichier'}`}
+                  onClick={async () => {
+                    setError(null)
+                    try {
+                      await onRemove(ids.filter((x) => x !== id))
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : 'Erreur')
+                    }
+                  }}
+                >
+                  <X />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {error && (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
+        <DialogFooter>
+          <FileAttachButton
+            uploading={uploading}
+            onFiles={(f) => void onAttach(f)}
+            label="Ajouter"
+          />
+          <Button type="button" onClick={onClose}>
+            Terminé
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} o`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} Ko`
+  return `${(bytes / 1024 / 1024).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} Mo`
 }
 
 /** Brouillon local : chaîne pour les champs de saisie, valeur typée pour les choix. */

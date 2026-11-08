@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import { PassThrough } from 'node:stream'
 import Anthropic from '@anthropic-ai/sdk'
 import cookie from '@fastify/cookie'
+import multipart from '@fastify/multipart'
 import fastifyStatic from '@fastify/static'
 import type { Db } from '@questionnaire/db'
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify'
@@ -23,12 +24,24 @@ import {
   type ChatEvent,
   type Form,
   formatAnswer,
+  MAX_FILE_SIZE,
   missingRequired,
   STATUS_LABELS,
   validateAnswer,
 } from './domain.ts'
+import {
+  addImage,
+  addRespondentFile,
+  type FileRow,
+  fileInfos,
+  findFile,
+  requireStorage,
+  saveFileAnswer,
+  type Upload,
+} from './files.ts'
 import { registerMcp } from './mcp.ts'
 import { createLoginLimiter, createSigner, registerOAuth, verifyAccessToken } from './oauth.ts'
+import type { Storage } from './storage.ts'
 import {
   findRespondentByToken,
   loadAnswers,
@@ -49,6 +62,8 @@ export interface AppOptions {
   logger?: boolean | object
   /** Dossier du front compilé, servi sur le même domaine (production). */
   webDist?: string
+  /** Stockage S3 des images et fichiers joints ; absent, ces fonctions répondent 503. */
+  storage?: Storage
 }
 
 const ADMIN_COOKIE = 'admin_session'
@@ -69,10 +84,13 @@ export function buildApp({
   publicUrl,
   logger = false,
   webDist,
+  storage,
 }: AppOptions) {
   // trustProxy : derrière Traefik (Dokploy), pour l'IP et le protocole réels.
   const app = Fastify({ logger, trustProxy: true })
   app.register(cookie)
+  // Un fichier par requête ; au-delà de la taille maximale, `toBuffer()` lève une erreur 413.
+  app.register(multipart, { limits: { fileSize: MAX_FILE_SIZE, files: 1, fields: 0 } })
 
   app.get('/api/health', async () => ({ ok: true }))
 
@@ -126,6 +144,7 @@ export function buildApp({
     const answers = await loadAnswers(db, respondentId)
     return {
       answers,
+      files: await fileInfos(db, respondentId),
       messages: visibleMessages(rows),
       pending: pendingQuestion(form, rows, answers),
     }
@@ -198,11 +217,81 @@ export function buildApp({
     const { respondent, form } = await respondentOrThrow(token)
     if (respondent.submittedAt) throw new HttpError(409, 'Réponses déjà envoyées')
     const { value } = z.object({ value: z.unknown() }).parse(req.body)
-    const result = validateAnswer(form, questionId, value)
-    if (!result.ok) throw new HttpError(400, result.error)
-    await saveAnswer(db, respondent.id, questionId, result.value, 'manual')
-    return { answers: await loadAnswers(db, respondent.id) }
+    const question = allQuestions(form).find((q) => q.id === questionId)
+    if (question?.type === 'file') {
+      // On ne peut que retirer des fichiers ici (liste vide : tout retirer) ; on en ajoute par l'envoi.
+      const ids = Array.isArray(value) && value.length === 0 ? null : value
+      const result = ids === null ? null : validateAnswer(form, questionId, ids)
+      if (result && !result.ok) throw new HttpError(400, result.error)
+      await saveFileAnswer(
+        db,
+        storage,
+        respondent.id,
+        questionId,
+        result ? (result.value as string[]) : null,
+      )
+    } else {
+      const result = validateAnswer(form, questionId, value)
+      if (!result.ok) throw new HttpError(400, result.error)
+      await saveAnswer(db, respondent.id, questionId, result.value, 'manual')
+    }
+    return {
+      answers: await loadAnswers(db, respondent.id),
+      files: await fileInfos(db, respondent.id),
+    }
   })
+
+  // Fichier joint à une question `file` (multipart, un fichier).
+  app.post('/api/r/:token/files/:questionId', async (req) => {
+    const { token, questionId } = tokenParams
+      .extend({ questionId: z.string().max(100) })
+      .parse(req.params)
+    const { respondent, form } = await respondentOrThrow(token)
+    if (respondent.submittedAt) throw new HttpError(409, 'Réponses déjà envoyées')
+    const file = await readUpload(req)
+    const added = await addRespondentFile(db, storage, form, respondent.id, questionId, file)
+    return {
+      file: added,
+      answers: await loadAnswers(db, respondent.id),
+      files: await fileInfos(db, respondent.id),
+    }
+  })
+
+  // Le répondant retélécharge un de ses fichiers.
+  app.get('/api/r/:token/files/:fileId', async (req, reply) => {
+    const { token, fileId } = tokenParams.extend({ fileId: z.uuid() }).parse(req.params)
+    const { respondent } = await respondentOrThrow(token)
+    const file = await findFile(db, fileId)
+    if (file.respondentId !== respondent.id) throw new HttpError(404, 'Fichier introuvable')
+    return redirectToFile(reply, file)
+  })
+
+  // Images des questionnaires : publiques (id non devinable), servies par lien signé.
+  app.get('/api/images/:id', async (req, reply) => {
+    const { id } = z.object({ id: z.uuid() }).parse(req.params)
+    const file = await findFile(db, id)
+    if (file.kind !== 'image') throw new HttpError(404, 'Image introuvable')
+    reply.header('cache-control', 'public, max-age=1800')
+    return redirectToFile(reply, file, true)
+  })
+
+  async function readUpload(req: FastifyRequest): Promise<Upload> {
+    if (!req.isMultipart()) throw new HttpError(400, 'Envoi multipart/form-data attendu')
+    const part = await req.file()
+    if (!part) throw new HttpError(400, 'Aucun fichier reçu')
+    try {
+      return { filename: part.filename, contentType: part.mimetype, body: await part.toBuffer() }
+    } catch {
+      throw new HttpError(413, `Fichier trop lourd (${MAX_FILE_SIZE / 1024 / 1024} Mo maximum)`)
+    }
+  }
+
+  async function redirectToFile(reply: FastifyReply, file: FileRow, inline = false) {
+    const url = await requireStorage(storage).signedUrl(file.key, file.filename, {
+      inline: inline || file.contentType.startsWith('image/'),
+    })
+    return reply.redirect(url, 302)
+  }
 
   app.post('/api/r/:token/submit', async (req) => {
     const { respondent, form } = await respondentOrThrow(tokenParams.parse(req.params).token)
@@ -272,7 +361,7 @@ export function buildApp({
 
   app.delete('/api/admin/forms/:formId', async (req) => {
     requireAdmin(req)
-    return deleteForm(db, formParams.parse(req.params).formId)
+    return deleteForm(db, storage, formParams.parse(req.params).formId)
   })
 
   app.post('/api/admin/forms/:formId/respondents', async (req) => {
@@ -289,6 +378,18 @@ export function buildApp({
     return getRespondentDetail(db, id, origin(req))
   })
 
+  app.get('/api/admin/files/:id', async (req, reply) => {
+    requireAdmin(req)
+    const { id } = z.object({ id: z.uuid() }).parse(req.params)
+    return redirectToFile(reply, await findFile(db, id))
+  })
+
+  // Image pour un questionnaire (multipart) ; renvoie l'adresse à mettre dans `image.url`.
+  app.post('/api/admin/images', async (req) => {
+    requireAdmin(req)
+    return addImage(db, storage, await readUpload(req), origin(req))
+  })
+
   app.get('/api/admin/forms/:formId/export', async (req, reply) => {
     requireAdmin(req)
     const form = await formOrThrow(db, formParams.parse(req.params).formId)
@@ -296,24 +397,38 @@ export function buildApp({
     const rows = await exportAnswers(db, form)
     sendDownload(reply, `${form.id}.${format}`)
     if (format === 'json') {
-      return rows.map(({ respondent: r, status, answers }) => ({
+      return rows.map(({ respondent: r, status, answers, files }) => ({
         name: r.name,
         email: r.email,
         status,
         submittedAt: r.submittedAt,
         answers,
+        // Fichiers joints : nom et lien de téléchargement (connexion admin requise).
+        files: Object.values(files)
+          .filter((f) => f.respondentId === r.id)
+          .map((f) => ({
+            questionId: f.questionId,
+            filename: f.filename,
+            url: `${origin(req)}/api/admin/files/${f.id}`,
+          })),
       }))
     }
     const questions = allQuestions(form)
     const header = ['Nom', 'E-mail', 'Statut', 'Envoyé le', ...questions.map((q) => q.label)]
-    const lines = rows.map(({ respondent: r, status, answers: a }) => [
+    const lines = rows.map(({ respondent: r, status, answers: a, files }) => [
       r.name,
       r.email ?? '',
       STATUS_LABELS[status],
       r.submittedAt?.toISOString() ?? '',
       // Nombres bruts : un tableur les lit comme des nombres, pas comme du texte « 3 000 ».
       ...questions.map((q) =>
-        q.type === 'number' ? String(a[q.id] ?? '') : formatAnswer(q, a[q.id]),
+        q.type === 'number'
+          ? String(a[q.id] ?? '')
+          : q.type === 'file' && Array.isArray(a[q.id])
+            ? (a[q.id] as string[])
+                .map((id) => `${files[id]?.filename ?? id} (${origin(req)}/api/admin/files/${id})`)
+                .join(' ; ')
+            : formatAnswer(q, a[q.id]),
       ),
     ])
     // BOM : Excel ouvre alors le fichier en UTF-8 (accents intacts).
@@ -325,6 +440,7 @@ export function buildApp({
   registerOAuth(app, { adminPassword, origin, signer, safeEqual, limiter })
   registerMcp(app, {
     db,
+    storage,
     origin,
     authorize: (req) => {
       const bearer = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1]

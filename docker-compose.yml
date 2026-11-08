@@ -18,5 +18,21 @@ services:
       timeout: 5s
       retries: 10
 
+  # Stockage S3 local (images et fichiers des répondants), RustFS : compatible S3, libre.
+  # Le bucket est créé par l'API au démarrage (S3_CREATE_BUCKET=true). En production : un vrai S3.
+  s3:
+    image: rustfs/rustfs:latest
+    container_name: questionnaire-s3
+    environment:
+      RUSTFS_ACCESS_KEY: questionnaire
+      RUSTFS_SECRET_KEY: questionnaire
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: ":9000"
+    ports:
+      - "9100:9000"
+    volumes:
+      - questionnaire-s3data:/data
+
 volumes:
   questionnaire-pgdata:
+  questionnaire-s3data:

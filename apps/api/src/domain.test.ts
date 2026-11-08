@@ -15,6 +15,7 @@ sections:
       - { id: budget, label: Budget, type: number }
       - { id: jour, label: Jour, type: date }
       - { id: ok, label: OK, type: yesno }
+      - { id: pieces, label: Pièces, type: file, image: { url: 'https://exemple.fr/a.png', alt: A } }
 `
 const form = parseForm('test', YAML)
 
@@ -107,5 +108,40 @@ describe('validation de record_answer par type', () => {
     expect(formatAnswer(q('ok')!, true)).toBe('Oui')
     // biome-ignore lint/style/noNonNullAssertion: idem
     expect(formatAnswer(q('jour')!, '2026-03-15')).toBe('15/03/2026')
+  })
+})
+
+describe('fichiers et images', () => {
+  const uuid = '3f2504e0-4f89-41d3-9a0c-0305e82c3301'
+  it('file : liste d’id de fichiers, dédoublonnée, 10 au plus', () => {
+    const r = validateAnswer(form, 'pieces', [uuid, uuid])
+    expect(r.ok && r.value).toEqual([uuid])
+    expect(validateAnswer(form, 'pieces', []).ok).toBe(false)
+    expect(validateAnswer(form, 'pieces', ['pas-un-id']).ok).toBe(false)
+    expect(validateAnswer(form, 'pieces', 'plan.pdf').ok).toBe(false)
+    const many = Array.from(
+      { length: 11 },
+      (_, i) => `3f2504e0-4f89-41d3-9a0c-0305e82c33${String(i).padStart(2, '0')}`,
+    )
+    expect(validateAnswer(form, 'pieces', many).ok).toBe(false)
+  })
+
+  it('formatAnswer affiche les noms des fichiers', () => {
+    const q = form.sections[0]?.questions.find((x) => x.id === 'pieces')
+    // biome-ignore lint/style/noNonNullAssertion: question du YAML ci-dessus
+    expect(formatAnswer(q!, [uuid], { [uuid]: 'plan.pdf' })).toBe('plan.pdf')
+  })
+
+  it.each([
+    [
+      'image en http(s) seulement',
+      "{ id: a, label: A, type: text, image: { url: 'ftp://x/a.png' } }",
+    ],
+    ['image sans url', '{ id: a, label: A, type: text, image: { alt: A } }'],
+    ['suggestions sur un fichier', '{ id: a, label: A, type: file, suggestions: [x] }'],
+    ['options sur un fichier', '{ id: a, label: A, type: file, options: [x, y] }'],
+  ])('refuse : %s', (_, question) => {
+    const source = `title: T\nintro: I\nsections:\n  - title: S\n    questions:\n      - ${question}\n`
+    expect(() => parseForm('bad', source)).toThrow(/invalide/)
   })
 })

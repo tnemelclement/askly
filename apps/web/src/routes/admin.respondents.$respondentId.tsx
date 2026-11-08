@@ -7,7 +7,7 @@ import {
 } from '@questionnaire/api/domain'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Paperclip } from 'lucide-react'
 import {
   ConversationThread,
   GuideMessage,
@@ -15,7 +15,7 @@ import {
 } from '@/components/conversation/conversation'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { api } from '@/lib/api'
+import { api, type FileInfo } from '@/lib/api'
 import { STATUS_VARIANTS } from '@/lib/status'
 
 export const Route = createFileRoute('/admin/respondents/$respondentId')({
@@ -32,6 +32,7 @@ interface Detail {
   }
   form: Form
   answers: Answers
+  files: Record<string, FileInfo>
   messages: { id: number; role: 'user' | 'assistant'; text: string }[]
 }
 
@@ -43,7 +44,7 @@ function RespondentPage() {
   })
   if (query.isPending) return <p className="text-sm text-muted-foreground">Chargement…</p>
   if (query.isError) return <p className="text-sm text-destructive">{query.error.message}</p>
-  const { respondent, form, answers, messages } = query.data
+  const { respondent, form, answers, files, messages } = query.data
 
   return (
     <div className="space-y-6">
@@ -87,6 +88,22 @@ function RespondentPage() {
                       <dd className="text-sm whitespace-pre-wrap">
                         {answers[q.id] === undefined ? (
                           <span className="text-muted-foreground">—</span>
+                        ) : q.type === 'file' && Array.isArray(answers[q.id]) ? (
+                          <ul className="space-y-1">
+                            {(answers[q.id] as string[]).map((id) => (
+                              <li key={id}>
+                                <a
+                                  href={`/api/admin/files/${id}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1.5 underline-offset-4 hover:underline"
+                                >
+                                  <Paperclip className="size-3.5" aria-hidden="true" />
+                                  {files[id]?.filename ?? 'fichier'}
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
                         ) : (
                           formatAnswer(q, answers[q.id])
                         )}

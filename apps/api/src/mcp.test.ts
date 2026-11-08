@@ -3,6 +3,7 @@ import type Anthropic from '@anthropic-ai/sdk'
 import type { Db } from '@questionnaire/db'
 import { describe, expect, it } from 'vitest'
 import { buildApp } from './app.ts'
+import { isPrivateAddress } from './files.ts'
 import { createLoginLimiter, createSigner, isAllowedRedirect, pkceMatches } from './oauth.ts'
 
 // Ni base ni IA : ces tests ne couvrent que l'authentification et la découverte des outils.
@@ -48,6 +49,7 @@ describe('MCP', () => {
       'delete_form',
       'delete_respondent',
       'get_answers',
+      'get_file',
       'get_form',
       'get_respondent',
       'list_forms',
@@ -55,6 +57,7 @@ describe('MCP', () => {
       'set_answer',
       'update_form',
       'update_respondent',
+      'upload_image',
     ])
   })
 })
@@ -198,5 +201,22 @@ describe('briques OAuth', () => {
     expect(l.blocked()).toBe(false)
     l.fail()
     expect(l.blocked()).toBe(true)
+  })
+})
+
+describe('protection SSRF de upload_image', () => {
+  it.each([
+    '127.0.0.1',
+    '10.1.2.3',
+    '172.16.0.1',
+    '192.168.1.1',
+    '169.254.169.254',
+    '::1',
+    'fd00::1',
+    '::ffff:10.0.0.1',
+  ])('refuse %s', (ip) => expect(isPrivateAddress(ip)).toBe(true))
+  it('accepte une adresse publique', () => {
+    expect(isPrivateAddress('51.83.46.173')).toBe(false)
+    expect(isPrivateAddress('2001:4860:4860::8888')).toBe(false)
   })
 })

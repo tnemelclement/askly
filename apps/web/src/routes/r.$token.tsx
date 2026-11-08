@@ -16,7 +16,14 @@ import {
 import { QuickReplies } from '@/components/conversation/quick-replies'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { api, type ChatEvent, streamChat } from '@/lib/api'
+import {
+  api,
+  type ChatEvent,
+  type FileInfo,
+  MAX_UPLOAD_MB,
+  streamChat,
+  uploadFile,
+} from '@/lib/api'
 import { hasFinePointer } from '@/lib/device'
 
 export const Route = createFileRoute('/r/$token')({ component: RespondentPage })
@@ -37,6 +44,7 @@ interface RespondentData {
   form: Form
   respondent: { name: string; submittedAt: string | null }
   answers: Answers
+  files: Record<string, FileInfo>
   messages: { id: number; role: 'user' | 'assistant'; text: string }[]
   pending: Pending | null
 }
@@ -67,6 +75,8 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
     initial.messages.map((m) => ({ ...m, id: String(m.id) })),
   )
   const [answers, setAnswers] = useState<Answers>(initial.answers)
+  const [files, setFiles] = useState(initial.files)
+  const [uploading, setUploading] = useState(false)
   const [locked, setLocked] = useState(Boolean(initial.respondent.submittedAt))
   const [streaming, setStreaming] = useState(false)
   // Vrai entre le début d'un tour assistant et son premier mot : on montre « écrit… ».
@@ -140,12 +150,42 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
   }
 
   async function editAnswer(questionId: string, value: AnswerValue) {
-    const res = await api<{ answers: Answers }>(`/api/r/${token}/answers/${questionId}`, {
-      method: 'PUT',
-      body: { value },
-    })
+    const res = await api<{ answers: Answers; files: Record<string, FileInfo> }>(
+      `/api/r/${token}/answers/${questionId}`,
+      { method: 'PUT', body: { value } },
+    )
     setAnswers(res.answers)
+    setFiles(res.files)
     toast.success('Réponse corrigée')
+  }
+
+  /**
+   * Envoie les fichiers un par un. Depuis le fil (`announce`), un message les annonce ensuite
+   * à l'assistant pour qu'il enchaîne ; depuis le panneau, ils apparaissent juste dans l'état.
+   */
+  async function attach(questionId: string, list: File[], announce: boolean) {
+    setUploading(true)
+    const sent: string[] = []
+    for (const file of list) {
+      if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
+        toast.error(`${file.name} : ${MAX_UPLOAD_MB} Mo maximum`)
+        continue
+      }
+      try {
+        const res = await uploadFile(token, questionId, file)
+        setAnswers(res.answers)
+        setFiles(res.files)
+        sent.push(file.name)
+      } catch (err) {
+        toast.error(`${file.name} : ${err instanceof Error ? err.message : 'envoi impossible'}`)
+      }
+    }
+    setUploading(false)
+    if (sent.length && announce) {
+      void send(`${sent.length > 1 ? 'Fichiers joints' : 'Fichier joint'} : ${sent.join(', ')}`)
+    } else if (sent.length) {
+      toast.success(sent.length > 1 ? 'Fichiers ajoutés' : 'Fichier ajouté')
+    }
   }
 
   async function submitAll() {
@@ -174,6 +214,10 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
         <AnswersPanel
           form={form}
           answers={answers}
+          files={files}
+          fileHref={(id) => `/api/r/${token}/files/${id}`}
+          onAttach={(questionId, list) => attach(questionId, list, false)}
+          uploading={uploading}
           locked={locked}
           onEdit={editAnswer}
           onSubmit={submitAll}
@@ -228,6 +272,13 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
         )
       }
     >
+      {form.image && (
+        <img
+          src={form.image.url}
+          alt={form.image.alt ?? ''}
+          className="mb-5 max-h-64 w-full rounded-xl border object-cover"
+        />
+      )}
       <p className="mb-6 text-sm text-muted-foreground">{form.intro}</p>
       <ConversationThread>
         {bubbles.map((b) =>
@@ -238,9 +289,20 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
           ),
         )}
         {waiting && <ThinkingMessage />}
+        {!streaming && !locked && pendingQuestion?.image && (
+          <li className="ml-11">
+            <img
+              src={pendingQuestion.image.url}
+              alt={pendingQuestion.image.alt ?? ''}
+              className="max-h-80 max-w-full rounded-xl border object-contain"
+            />
+          </li>
+        )}
         {!streaming && !locked && pendingQuestion && (
           <li>
             <QuickReplies
+              onAttach={(list) => void attach(pendingQuestion.id, list, true)}
+              uploading={uploading}
               // Remis à zéro (cases cochées) à chaque nouvelle question.
               key={`${pendingQuestion.id}-${bubbles.length}`}
               question={pendingQuestion}

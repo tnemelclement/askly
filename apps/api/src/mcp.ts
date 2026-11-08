@@ -20,6 +20,16 @@ import {
   updateRespondent,
 } from './admin.ts'
 import { formSchema, missingRequired } from './domain.ts'
+import {
+  addImage,
+  type FileInfo,
+  type FileRow,
+  fetchImage,
+  findFile,
+  requireStorage,
+  type Upload,
+} from './files.ts'
+import { IMAGE_TYPES, type Storage } from './storage.ts'
 
 /**
  * Serveur MCP (`/mcp`, HTTP « streamable », sans état) : tout ce que fait l'admin, en outils.
@@ -35,6 +45,9 @@ Two kinds of questionnaires:
 Workflow to "make a questionnaire for X": write the definition, create_form, create_respondent, then give the user the link. Never send the link or any message to the respondent yourself: the user sends it (WhatsApp, email...).
 
 Writing good questionnaires: 5 to 12 questions, one idea each, natural order. Prefer choice / multichoice / yesno when answers are predictable (respondents click instead of typing). Add 2 to 4 "suggestions" to open questions when typical answers exist. Add "help" to any question that might not be understood: the AI uses it to explain. Put in "context" who the respondent is and what the answers are for. Write the questionnaire in the respondent's language (French by default, formal "vous"), without jargon.
+
+Images: a question (or the whole form) can show an image, "image": { "url": "...", "alt": "..." }. Upload it first with upload_image (from a URL or base64) and use the returned url.
+Files: a question of type "file" lets the respondent attach photos, PDFs or documents (20 MB each, 10 per question). Answers list the files; use get_file to download one or look at an image.
 
 When a questionnaire already has answers, keep question ids stable: an answer is attached to its question id and disappears if the id changes.`
 
@@ -59,7 +72,26 @@ async function run(fn: () => Promise<unknown>): Promise<ToolResult> {
   }
 }
 
-export function buildMcpServer(db: Db, origin: string): McpServer {
+export function buildMcpServer(db: Db, origin: string, storage?: Storage): McpServer {
+  /** Fichiers joints avec un lien de téléchargement signé (1 h), utilisable sans connexion. */
+  const fileLinks = (rows: FileRow[] | FileInfo[]) =>
+    Promise.all(
+      rows.map(async (f) => {
+        const row = 'key' in f ? f : null
+        return {
+          fileId: f.id,
+          ...('questionId' in f && { questionId: f.questionId }),
+          filename: f.filename,
+          contentType: f.contentType,
+          size: f.size,
+          downloadUrl:
+            storage && row
+              ? await storage.signedUrl(row.key, f.filename)
+              : `${origin}/api/admin/files/${f.id}`,
+        }
+      }),
+    )
+
   const server = new McpServer(
     { name: 'questionnaire', version: '1.0.0' },
     { instructions: INSTRUCTIONS },
@@ -97,7 +129,7 @@ export function buildMcpServer(db: Db, origin: string): McpServer {
     {
       title: 'Create a questionnaire',
       description:
-        'Create a new questionnaire. Fails if the id is already taken (use update_form to change an existing one). Question types: text, longtext, number, date (YYYY-MM-DD), yesno, choice (one option), multichoice (several). "options" (at least 2) is required for choice/multichoice and forbidden otherwise; "suggestions" (1 to 6 one-click answers) only on questions without options; "required" defaults to true; question ids: lowercase letters, digits and underscores, unique.',
+        'Create a new questionnaire. Fails if the id is already taken (use update_form to change an existing one). Question types: text, longtext, number, date (YYYY-MM-DD), yesno, choice (one option), multichoice (several), file (the respondent attaches photos/PDF/documents with a button; up to 10 files of 20 MB). Optional "image": { "url", "alt" } on a question or on the form (cover), url from upload_image. "options" (at least 2) is required for choice/multichoice and forbidden otherwise; "suggestions" (1 to 6 one-click answers) only on questions without options; "required" defaults to true; question ids: lowercase letters, digits and underscores, unique.',
       inputSchema: {
         form_id: formId,
         reusable: z
@@ -146,7 +178,7 @@ export function buildMcpServer(db: Db, origin: string): McpServer {
       inputSchema: { form_id: formId },
       annotations: { destructiveHint: true },
     },
-    ({ form_id }) => run(() => deleteForm(db, form_id)),
+    ({ form_id }) => run(() => deleteForm(db, storage, form_id)),
   )
 
   server.registerTool(
@@ -202,7 +234,7 @@ export function buildMcpServer(db: Db, origin: string): McpServer {
       inputSchema: { respondent_id: respondentId },
       annotations: { destructiveHint: true },
     },
-    ({ respondent_id }) => run(() => deleteRespondent(db, respondent_id)),
+    ({ respondent_id }) => run(() => deleteRespondent(db, storage, respondent_id)),
   )
 
   server.registerTool(
@@ -243,7 +275,8 @@ export function buildMcpServer(db: Db, origin: string): McpServer {
             submittedAt: d.respondent.submittedAt,
           },
           form: { id: d.form.id, title: d.form.title },
-          answers: readableAnswers(d.form, d.answers),
+          answers: readableAnswers(d.form, d.answers, d.files),
+          files: await fileLinks(Object.values(d.files)),
           missingRequired: missingRequired(d.form, d.answers).map((q) => q.id),
           ...(include_conversation && { conversation: d.messages }),
         }
@@ -265,15 +298,18 @@ export function buildMcpServer(db: Db, origin: string): McpServer {
     ({ form_id, status }) =>
       run(async () => {
         const form = await formOrThrow(db, form_id)
-        return (await exportAnswers(db, form))
-          .filter((r) => status === 'all' || r.status === status)
-          .map(({ respondent: r, status: s, answers }) => ({
-            respondentId: r.id,
-            name: r.name,
-            status: s,
-            submittedAt: r.submittedAt,
-            answers: readableAnswers(form, answers),
-          }))
+        return Promise.all(
+          (await exportAnswers(db, form))
+            .filter((r) => status === 'all' || r.status === status)
+            .map(async ({ respondent: r, status: s, answers, files }) => ({
+              respondentId: r.id,
+              name: r.name,
+              status: s,
+              submittedAt: r.submittedAt,
+              answers: readableAnswers(form, answers, files),
+              files: await fileLinks(Object.values(files).filter((f) => f.respondentId === r.id)),
+            })),
+        )
       }),
   )
 
@@ -295,16 +331,107 @@ export function buildMcpServer(db: Db, origin: string): McpServer {
       annotations: { idempotentHint: true },
     },
     ({ respondent_id, question_id, value }) =>
-      run(() => setAnswer(db, respondent_id, question_id, value)),
+      run(() => setAnswer(db, storage, respondent_id, question_id, value)),
+  )
+
+  server.registerTool(
+    'upload_image',
+    {
+      title: 'Upload an image',
+      description:
+        'Store an image (JPEG, PNG, WebP or GIF, 20 MB max) to illustrate a questionnaire, from a public https URL or from base64 content. Returns the url to put in a question\'s (or the form\'s) "image": { "url", "alt" }.',
+      inputSchema: {
+        source_url: z.url().optional().describe('Public https URL of the image to copy.'),
+        content_base64: z.string().optional().describe('Image content, base64-encoded.'),
+        filename: z
+          .string()
+          .max(200)
+          .optional()
+          .describe('File name, e.g. "terrasse.jpg" (needed with content_base64).'),
+        content_type: z.enum(['image/jpeg', 'image/png', 'image/webp', 'image/gif']).optional(),
+      },
+    },
+    ({ source_url, content_base64, filename, content_type }) =>
+      run(async () => {
+        let upload: Upload
+        if (source_url) {
+          upload = await fetchImage(source_url)
+        } else if (content_base64) {
+          upload = {
+            filename: filename ?? 'image',
+            contentType: content_type ?? guessImageType(filename ?? ''),
+            body: Buffer.from(content_base64, 'base64'),
+          }
+        } else {
+          throw new HttpError(400, 'source_url ou content_base64 requis')
+        }
+        if (filename) upload.filename = filename
+        const image = await addImage(db, storage, upload, origin)
+        return { url: image.url, filename: image.filename, size: image.size }
+      }),
+  )
+
+  server.registerTool(
+    'get_file',
+    {
+      title: 'Get a file',
+      description:
+        'Get a file a respondent attached (or a questionnaire image): its metadata and a signed download URL valid 1 hour. Images up to 5 MB are also returned as image content so you can look at them; small text/CSV files as text.',
+      inputSchema: { file_id: z.uuid() },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ file_id }) => {
+      try {
+        const s3 = requireStorage(storage)
+        const file = await findFile(db, file_id)
+        const meta = {
+          fileId: file.id,
+          filename: file.filename,
+          contentType: file.contentType,
+          size: file.size,
+          downloadUrl: await s3.signedUrl(file.key, file.filename),
+        }
+        const content: (
+          | { type: 'text'; text: string }
+          | { type: 'image'; data: string; mimeType: string }
+        )[] = [{ type: 'text', text: JSON.stringify(meta, null, 2) }]
+        if (IMAGE_TYPES.has(file.contentType) && file.size <= 5 * 1024 * 1024) {
+          content.push({
+            type: 'image',
+            data: (await s3.read(file.key)).toString('base64'),
+            mimeType: file.contentType,
+          })
+        } else if (/^text\/(plain|csv)$/.test(file.contentType) && file.size <= 200_000) {
+          content.push({ type: 'text', text: (await s3.read(file.key)).toString('utf8') })
+        }
+        return { content }
+      } catch (err) {
+        if (err instanceof HttpError)
+          return { content: [{ type: 'text' as const, text: err.message }], isError: true }
+        throw err
+      }
+    },
   )
 
   return server
+}
+
+function guessImageType(filename: string): string {
+  const ext = filename.toLowerCase().split('.').pop()
+  return ext === 'png'
+    ? 'image/png'
+    : ext === 'webp'
+      ? 'image/webp'
+      : ext === 'gif'
+        ? 'image/gif'
+        : 'image/jpeg'
 }
 
 export function registerMcp(
   app: FastifyInstance,
   opts: {
     db: Db
+    storage?: Storage | undefined
     origin: (req: FastifyRequest) => string
     authorize: (req: FastifyRequest) => boolean
   },
@@ -324,7 +451,7 @@ export function registerMcp(
           .send({ error: 'unauthorized' })
       }
       // Sans état : un serveur et un transport par requête.
-      const server = buildMcpServer(opts.db, opts.origin(req))
+      const server = buildMcpServer(opts.db, opts.origin(req), opts.storage)
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: undefined,
         enableJsonResponse: true,

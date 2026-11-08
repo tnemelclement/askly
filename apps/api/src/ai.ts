@@ -11,6 +11,7 @@ import {
   type Question,
   validateAnswer,
 } from './domain.ts'
+import { fileInfos } from './files.ts'
 import {
   appendMessages,
   loadAnswers,
@@ -42,6 +43,7 @@ const TYPE_HINTS: Record<Question['type'], string> = {
   number: 'nombre JSON (ex. 1500), sans unité',
   date: 'chaîne AAAA-MM-JJ',
   yesno: 'booléen JSON true ou false',
+  file: `fichier(s) que le répondant joint lui-même avec le bouton « Joindre un fichier » sous la question (photos, PDF, documents) ; ne jamais utiliser ${RECORD_ANSWER_TOOL} pour ce type`,
 }
 
 function describeQuestion(q: Question): string {
@@ -49,6 +51,11 @@ function describeQuestion(q: Question): string {
   lines.push(`  type : ${TYPE_HINTS[q.type]}`)
   if (q.options) lines.push(`  options : ${q.options.map((o) => `"${o}"`).join(', ')}`)
   if (q.help) lines.push(`  aide : ${q.help.trim()}`)
+  if (q.image) {
+    lines.push(
+      `  image : affichée au répondant avec la question${q.image.alt ? ` (${q.image.alt})` : ''}`,
+    )
+  }
   return lines.join('\n')
 }
 
@@ -70,6 +77,7 @@ Règles :
 - Si la réponse est ambiguë ou incomplète, demandez une précision au lieu de deviner. N'inventez jamais une réponse.
 - Si la personne corrige une réponse précédente, réenregistrez-la.
 - Une question facultative peut être passée si la personne ne souhaite pas répondre.
+- Pour une question de type fichier, invitez la personne à utiliser le bouton « Joindre un fichier » ; quand elle a joint ses fichiers, son message l'indique (les noms apparaissent dans l'état), enchaînez.
 - Si l'outil renvoie une erreur, corrigez la valeur ou reposez la question.
 - Restez sur le sujet du questionnaire ; déclinez poliment le reste.
 - Pas de Markdown (ni gras, ni titres) ; des tirets simples pour une liste.
@@ -152,11 +160,15 @@ export function mergeSuggestions(q: Question, fromAi: unknown): string[] {
 }
 
 /** État joint à chaque message du répondant : ce qui est rempli, ce qui manque. */
-export function describeState(form: Form, answers: Answers): string {
+export function describeState(
+  form: Form,
+  answers: Answers,
+  fileNames: Record<string, string> = {},
+): string {
   const lines = allQuestions(form).map((q) =>
     answers[q.id] === undefined
       ? `- ${q.id} : (vide)${q.required ? '' : ' facultative'}`
-      : `- ${q.id} : ${formatAnswer(q, answers[q.id])}`,
+      : `- ${q.id} : ${formatAnswer(q, answers[q.id], fileNames)}`,
   )
   const missing = missingRequired(form, answers).length
   return `<etat_du_questionnaire>\n${lines.join('\n')}\n${missing === 0 ? 'Toutes les questions obligatoires sont remplies.' : `${missing} question(s) obligatoire(s) restante(s).`}\n</etat_du_questionnaire>`
@@ -197,6 +209,9 @@ export async function applyToolCall(
   if (!input.success) return fail('entrée invalide : { question_id, value } attendu')
   const result = validateAnswer(form, input.data.question_id, input.data.value)
   if (!result.ok) return fail(result.error)
+  if (result.question.type === 'file') {
+    return fail('les fichiers se joignent par le bouton « Joindre un fichier », pas par cet outil')
+  }
   await saveAnswer(db, respondentId, result.question.id, result.value, 'ai')
   emit({ type: 'answer', questionId: result.question.id, value: result.value })
   return {
@@ -226,7 +241,10 @@ export async function runTurn(opts: {
   const { db, client, form, respondent, message, emit } = opts
   await markStarted(db, respondent.id)
 
-  const state = describeState(form, await loadAnswers(db, respondent.id))
+  const names = Object.fromEntries(
+    Object.values(await fileInfos(db, respondent.id)).map((f) => [f.id, f.filename]),
+  )
+  const state = describeState(form, await loadAnswers(db, respondent.id), names)
   await appendMessages(db, respondent.id, [
     {
       role: 'user',
