@@ -6,7 +6,7 @@ import { usePrefersReducedMotion } from './motion'
 /**
  * Briques du fil de conversation :
  * - `ConversationThread` : liste ordonnée, région `aria-live="polite"` ;
- * - `GuideMessage` : bulle de l'assistant, à gauche ;
+ * - `GuideMessage` : message de l'assistant, à gauche, en texte simple (sans bulle) ;
  * - `UserAnswer` : message du répondant, à droite ;
  * - `ThinkingMessage` : l'assistant prépare sa réponse.
  * Entrée en fondu, désactivée sous `prefers-reduced-motion`.
@@ -34,7 +34,7 @@ export function GuideMessage({ children, className }: { children: ReactNode; cla
       >
         <Bot className="size-4" />
       </div>
-      <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-muted px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap">
+      <div className="min-w-0 flex-1 pt-1 text-[15px] leading-relaxed whitespace-pre-wrap">
         <span className="sr-only">Assistant : </span>
         {children}
       </div>
