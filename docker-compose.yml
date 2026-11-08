@@ -1,5 +1,8 @@
 # Postgres local pour le dev et les tests. Strictement local : identifiants de dev,
 # repris dans `.env.example` (`postgresql://askly:askly@localhost:5436/askly`).
+# Nom fixe : sinon Compose le déduit du dossier.
+name: askly
+
 services:
   postgres:
     image: postgres:18-alpine
