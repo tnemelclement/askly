@@ -359,8 +359,8 @@ export async function runTurn(opts: {
 /**
  * Question en attente de réponse (boutons sous le fil, en direct comme après un
  * rechargement) : le dernier `present_question` qui n'a pas été suivi d'un message du
- * répondant. Le modèle oublie parfois l'outil : si son dernier message contient une
- * question, on retient celle qui suit la dernière remplie (`nextQuestion`).
+ * répondant. Le modèle oublie parfois l'outil : après son dernier message, on retient
+ * celle qui suit la dernière remplie (`nextQuestion`).
  */
 export function pendingQuestion(
   form: Form,
@@ -381,7 +381,9 @@ export function pendingQuestion(
         pending = { questionId: q.id, suggestions: mergeSuggestions(q, input.data.suggestions) }
     }
   }
-  if (pending || !lastText?.includes('?')) return pending
+  // L'IA a la main (pas de message du répondant en attente) : sa question, posée ou non
+  // avec un « ? » (« Décrivez… »), est a priori la suivante.
+  if (pending || lastText === null) return pending
   const next = nextQuestion(form, answers)
   return next ? { questionId: next.id, suggestions: mergeSuggestions(next, []) } : null
 }

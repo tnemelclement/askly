@@ -74,14 +74,18 @@ describe('question en attente (reprise)', () => {
     expect(pendingQuestion(form, [present('activite', ['Bois']), user('Ébéniste')], {})).toBeNull()
   })
 
-  it('se rabat sur la première question restante si l’IA a posé une question sans l’outil', () => {
+  it('se rabat sur la question suivante si l’IA a posé une question sans l’outil', () => {
     const asked = { role: 'assistant' as const, display: 'Quelle offre ?', content: [] }
     expect(pendingQuestion(form, [user('Artisan'), asked], { activite: 'Artisan' })).toEqual({
       questionId: 'offre',
       suggestions: [],
     })
-    const told = { role: 'assistant' as const, display: 'Merci, c’est noté.', content: [] }
-    expect(pendingQuestion(form, [user('Artisan'), told], {})).toBeNull()
+    const told = { role: 'assistant' as const, display: 'Décrivez votre offre.', content: [] }
+    expect(pendingQuestion(form, [user('Artisan'), told], { activite: 'Artisan' })).toEqual({
+      questionId: 'offre',
+      suggestions: [],
+    })
+    expect(pendingQuestion(form, [asked, user('B')], { activite: 'Artisan' })).toBeNull()
   })
 
   it('passe une facultative laissée vide derrière la dernière réponse', () => {
@@ -93,6 +97,9 @@ describe('question en attente (reprise)', () => {
   })
 
   it('ignore une question inconnue', () => {
-    expect(pendingQuestion(form, [present('inexistante')], {})).toBeNull()
+    expect(pendingQuestion(form, [present('inexistante')], {})).toEqual({
+      questionId: 'activite',
+      suggestions: ['Artisan', 'Commerce'],
+    })
   })
 })

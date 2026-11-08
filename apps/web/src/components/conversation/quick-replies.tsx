@@ -56,7 +56,9 @@ export function QuickReplies({
                 on &&
                   'border-primary bg-primary text-primary-foreground hover:bg-primary/85 hover:text-primary-foreground',
               )}
-              onClick={() => setSelected(on ? selected.filter((s) => s !== o) : [...selected, o])}
+              onClick={() =>
+                setSelected((prev) => (on ? prev.filter((s) => s !== o) : [...prev, o]))
+              }
             >
               {on && <Check />}
               {o}
