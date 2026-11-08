@@ -81,6 +81,24 @@ describe('OAuth', () => {
     expect(res.statusCode).toBe(400)
   })
 
+  it('échappe le nom du client dans la page de connexion', async () => {
+    const reg = await app.inject({
+      method: 'POST',
+      url: '/oauth/register',
+      payload: { redirect_uris: [redirect], client_name: '<script>alert(1)</script>' },
+    })
+    const query = new URLSearchParams({
+      response_type: 'code',
+      client_id: reg.json().client_id,
+      redirect_uri: redirect,
+      code_challenge: challenge,
+      code_challenge_method: 'S256',
+    })
+    const page = await app.inject({ url: `/oauth/authorize?${query}` })
+    expect(page.body).not.toContain('<script>alert')
+    expect(page.body).toContain('&lt;script&gt;')
+  })
+
   it('déroule enregistrement → connexion → jeton → appel MCP', async () => {
     const reg = await app.inject({
       method: 'POST',

@@ -110,7 +110,9 @@ const authorizeQuery = z.object({
 function loginPage(params: z.infer<typeof authorizeQuery>, clientName: string, error?: string) {
   const hidden = Object.entries(params)
     .filter(([, v]) => v !== undefined)
-    .map(([k, v]) => `<input type="hidden" name="${escape(k)}" value="${escape(String(v))}">`)
+    .map(
+      ([k, v]) => `<input type="hidden" name="${escapeHtml(k)}" value="${escapeHtml(String(v))}">`,
+    )
     .join('')
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Autoriser l'accès</title>
@@ -124,12 +126,12 @@ input[type=password]:focus{outline:none;border-color:#0b0b0c}
 button{margin-top:16px;width:100%;height:40px;border:0;border-radius:8px;background:#0b0b0c;color:#fff;font:inherit;font-weight:500;cursor:pointer}
 button:hover{opacity:.85}.error{color:#c4321f;font-size:13px;margin:8px 0 0}
 </style></head><body><main>
-<h1>Autoriser ${escape(clientName)}</h1>
+<h1>Autoriser ${escapeHtml(clientName)}</h1>
 <p>Accès complet à vos questionnaires : création, liens, réponses.</p>
 <form method="post" action="/oauth/authorize">${hidden}
 <label for="password">Mot de passe administrateur</label>
 <input id="password" name="password" type="password" autocomplete="current-password" autofocus required>
-${error ? `<p class="error" role="alert">${escape(error)}</p>` : ''}
+${error ? `<p class="error" role="alert">${escapeHtml(error)}</p>` : ''}
 <button type="submit">Autoriser</button>
 </form></main></body></html>`
 }
