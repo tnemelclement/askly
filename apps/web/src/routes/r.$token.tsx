@@ -14,6 +14,7 @@ import {
   UserAnswer,
 } from '@/components/conversation/conversation'
 import { QuickReplies } from '@/components/conversation/quick-replies'
+import { ZoomableImage } from '@/components/conversation/zoomable-image'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -273,7 +274,7 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
       }
     >
       {form.image && (
-        <img
+        <ZoomableImage
           src={form.image.url}
           alt={form.image.alt ?? ''}
           className="mb-5 max-h-64 w-full rounded-xl border object-cover"
@@ -291,7 +292,7 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
         {waiting && <ThinkingMessage />}
         {!streaming && !locked && pendingQuestion?.image && (
           <li className="ml-11">
-            <img
+            <ZoomableImage
               src={pendingQuestion.image.url}
               alt={pendingQuestion.image.alt ?? ''}
               className="max-h-80 max-w-full rounded-xl border object-contain"
