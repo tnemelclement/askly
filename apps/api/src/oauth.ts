@@ -90,7 +90,7 @@ export function createLoginLimiter(max = 10, windowMs = 15 * 60 * 1000) {
   }
 }
 
-const escape = (s: string) =>
+const escapeHtml = (s: string) =>
   s.replace(
     /[&<>"']/g,
     (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] ?? c,
