@@ -52,12 +52,12 @@ Vérifications : `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`.
 En production sur https://ask.tnemelc.fr, via Dokploy (`admn.tnemelc.fr`, projet
 `questionnaire`) : une seule image (`Dockerfile` racine, l'API sert aussi le front),
 Postgres 18 à côté, migrations au démarrage. Chaque push sur `main` qui touche `apps/`,
-`packages/`, `forms/` ou le `Dockerfile` redéploie. Ajouter un questionnaire en prod, c'est
-plus besoin de pousser quoi que ce soit : voir « Créer un questionnaire ».
+`packages/`, `forms/` ou le `Dockerfile` redéploie. Créer un questionnaire, lui, ne demande aucun
+push : voir « Créer un questionnaire ».
 
 Les variables de prod (`DATABASE_URL`, `ANTHROPIC_API_KEY`, `ADMIN_PASSWORD`,
-`ADMIN_API_TOKEN`, `PUBLIC_URL`, `NODE_ENV=production`) sont dans Dokploy ; copie des secrets dans le coffre iCloud
-(`Secrets/repos/questionnaire/.env.production`).
+`ADMIN_API_TOKEN`, `PUBLIC_URL`, `NODE_ENV=production`) sont dans Dokploy ; copie des
+secrets dans le coffre iCloud (`Secrets/repos/questionnaire/.env.production`).
 
 ## Variables d'environnement (`.env` à la racine, jamais versionné)
 

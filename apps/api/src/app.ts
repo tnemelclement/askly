@@ -3,7 +3,7 @@ import { PassThrough } from 'node:stream'
 import Anthropic from '@anthropic-ai/sdk'
 import cookie from '@fastify/cookie'
 import fastifyStatic from '@fastify/static'
-import { answers, type Db, respondents } from '@questionnaire/db'
+import { answers, type Db, forms, respondents } from '@questionnaire/db'
 import { count, desc, eq } from 'drizzle-orm'
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify'
 import { z } from 'zod'
@@ -302,6 +302,18 @@ export function buildApp({
       questionCount: allQuestions(form).length,
       adminUrl: `${origin(req)}/admin/forms/${form.id}`,
     }
+  })
+
+  // Supprime le questionnaire et ses répondants (réponses et conversations suivent, en cascade).
+  app.delete('/api/admin/forms/:formId', async (req) => {
+    requireAdmin(req)
+    const form = await formOrThrow(z.object({ formId: z.string() }).parse(req.params).formId)
+    const deleted = await db.transaction(async (tx) => {
+      const gone = await tx.delete(respondents).where(eq(respondents.formId, form.id)).returning()
+      await tx.delete(forms).where(eq(forms.id, form.id))
+      return gone.length
+    })
+    return { id: form.id, deletedRespondents: deleted }
   })
 
   app.post('/api/admin/forms/:formId/respondents', async (req) => {
