@@ -2,7 +2,7 @@ import type { Answers, AnswerValue, Form } from '@askly/api/domain'
 import { allQuestions } from '@askly/api/domain'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { ArrowUp } from 'lucide-react'
+import { ArrowUp, CircleCheck } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { AnswersPanel, answersCounterLabel } from '@/components/conversation/answers-panel'
@@ -216,12 +216,22 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
     try {
       await api(`/api/r/${token}/submit`, { method: 'POST', body: {} })
       setLocked(true)
-      toast.success('Merci, vos réponses ont été envoyées.')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erreur')
     } finally {
       setSubmitting(false)
     }
+  }
+
+  if (locked) {
+    return (
+      <div className="flex h-dvh flex-col items-center justify-center gap-4 p-6 text-center">
+        <CircleCheck className="size-16 text-primary" aria-hidden />
+        <p className="text-lg font-medium">
+          Vos réponses ont été envoyées. Merci {initial.respondent.name} !
+        </p>
+      </div>
+    )
   }
 
   const answeredCount = Object.keys(answers).length
@@ -248,51 +258,45 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
         />
       }
       composer={
-        locked ? (
-          <p className="py-2 text-center text-sm text-muted-foreground">
-            Vos réponses ont été envoyées. Merci {initial.respondent.name} !
-          </p>
-        ) : (
-          <form
-            onSubmit={onSubmitMessage}
-            className="flex items-end gap-2 rounded-xl border bg-background p-1.5 pl-2 shadow-soft transition-colors focus-within:border-foreground"
+        <form
+          onSubmit={onSubmitMessage}
+          className="flex items-end gap-2 rounded-xl border bg-background p-1.5 pl-2 shadow-soft transition-colors focus-within:border-foreground"
+        >
+          <label htmlFor="message" className="sr-only">
+            Votre message
+          </label>
+          <Textarea
+            id="message"
+            ref={inputRef}
+            rows={1}
+            autoFocus={hasFinePointer()}
+            value={draft}
+            maxLength={2000}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (
+                e.key === 'Enter' &&
+                !e.shiftKey &&
+                !e.nativeEvent.isComposing &&
+                hasFinePointer()
+              ) {
+                e.preventDefault()
+                onSubmitMessage()
+              }
+            }}
+            placeholder="Votre réponse, ou une question…"
+            className="max-h-40 min-h-10 resize-none border-0 bg-transparent px-3 py-2 shadow-none focus-visible:ring-0"
+          />
+          <Button
+            type="submit"
+            size="icon-lg"
+            className="size-10"
+            disabled={streaming || !draft.trim()}
+            aria-label="Envoyer"
           >
-            <label htmlFor="message" className="sr-only">
-              Votre message
-            </label>
-            <Textarea
-              id="message"
-              ref={inputRef}
-              rows={1}
-              autoFocus={hasFinePointer()}
-              value={draft}
-              maxLength={2000}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (
-                  e.key === 'Enter' &&
-                  !e.shiftKey &&
-                  !e.nativeEvent.isComposing &&
-                  hasFinePointer()
-                ) {
-                  e.preventDefault()
-                  onSubmitMessage()
-                }
-              }}
-              placeholder="Votre réponse, ou une question…"
-              className="max-h-40 min-h-10 resize-none border-0 bg-transparent px-3 py-2 shadow-none focus-visible:ring-0"
-            />
-            <Button
-              type="submit"
-              size="icon-lg"
-              className="size-10"
-              disabled={streaming || !draft.trim()}
-              aria-label="Envoyer"
-            >
-              <ArrowUp />
-            </Button>
-          </form>
-        )
+            <ArrowUp />
+          </Button>
+        </form>
       }
     >
       {form.image && (
@@ -312,7 +316,7 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
           ),
         )}
         {waiting && <ThinkingMessage />}
-        {!streaming && !locked && pendingQuestion?.image && (
+        {!streaming && pendingQuestion?.image && (
           <li className="ml-11">
             <ZoomableImage
               src={pendingQuestion.image.url}
@@ -321,7 +325,7 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
             />
           </li>
         )}
-        {!streaming && !locked && pendingQuestion && (
+        {!streaming && pendingQuestion && (
           <li>
             <QuickReplies
               onAttach={(list) => void attach(pendingQuestion.id, list, true)}
