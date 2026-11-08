@@ -292,7 +292,7 @@ function AnswerEditor({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <form onSubmit={save} className="grid gap-4">
           <DialogHeader>
             <DialogTitle>Corriger la réponse</DialogTitle>

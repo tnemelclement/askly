@@ -177,7 +177,7 @@ function FormPage() {
                     <div className="flex justify-end gap-1">
                       <Button
                         variant="ghost"
-                        size="icon-sm"
+                        size="icon"
                         aria-label={`Copier le lien de ${r.name}`}
                         title="Copier le lien"
                         onClick={async () => {
@@ -190,7 +190,7 @@ function FormPage() {
                       {r.email && (
                         <Button
                           variant="ghost"
-                          size="icon-sm"
+                          size="icon"
                           asChild
                           title="Préparer le mail (brouillon)"
                         >
@@ -202,7 +202,7 @@ function FormPage() {
                           </a>
                         </Button>
                       )}
-                      <Button variant="ghost" size="icon-sm" asChild title="Voir les réponses">
+                      <Button variant="ghost" size="icon" asChild title="Voir les réponses">
                         <Link
                           to="/admin/respondents/$respondentId"
                           params={{ respondentId: r.id }}

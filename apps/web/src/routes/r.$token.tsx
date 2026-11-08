@@ -17,6 +17,7 @@ import { QuickReplies } from '@/components/conversation/quick-replies'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { api, type ChatEvent, streamChat } from '@/lib/api'
+import { hasFinePointer } from '@/lib/device'
 
 export const Route = createFileRoute('/r/$token')({ component: RespondentPage })
 
@@ -113,7 +114,7 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
     } finally {
       setStreaming(false)
       setWaiting(false)
-      inputRef.current?.focus()
+      if (hasFinePointer()) inputRef.current?.focus()
     }
   }
 
@@ -196,17 +197,22 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
               id="message"
               ref={inputRef}
               rows={1}
-              autoFocus
+              autoFocus={hasFinePointer()}
               value={draft}
               maxLength={2000}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                if (
+                  e.key === 'Enter' &&
+                  !e.shiftKey &&
+                  !e.nativeEvent.isComposing &&
+                  hasFinePointer()
+                ) {
                   e.preventDefault()
                   onSubmitMessage()
                 }
               }}
-              placeholder="Votre réponse, ou une question si quelque chose n’est pas clair…"
+              placeholder="Votre réponse, ou une question…"
               className="max-h-40 min-h-10 resize-none border-0 bg-transparent px-3 py-2 shadow-none focus-visible:ring-0"
             />
             <Button

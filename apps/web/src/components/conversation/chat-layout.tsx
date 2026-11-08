@@ -1,6 +1,6 @@
 import { ClipboardList, PanelRightClose, PanelRightOpen } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -28,6 +28,14 @@ export function ChatLayout({
 }) {
   const [panelOpen, setPanelOpen] = useState(false)
   const panelId = useId()
+
+  // Panneau ouvert par-dessus le fil (sous 1280 px) : Échap le referme.
+  useEffect(() => {
+    if (!panelOpen) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setPanelOpen(false)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [panelOpen])
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-background">
@@ -58,16 +66,26 @@ export function ChatLayout({
           {/* `relative` : bloc conteneur des `sr-only`, sinon ils font déborder la racine. */}
           <main
             ref={scrollRef}
-            className="relative min-h-0 flex-1 overflow-y-auto px-4 py-8 sm:px-6"
+            className="relative min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-8"
           >
             <div className="mx-auto max-w-2xl">{children}</div>
           </main>
           {composer && (
-            <div className="shrink-0 bg-background px-4 pt-2 pb-4 sm:px-6">
+            <div className="shrink-0 bg-background px-3 pt-2 pb-3 sm:px-6 sm:pb-4">
               <div className="mx-auto max-w-2xl">{composer}</div>
             </div>
           )}
         </div>
+
+        {panelOpen && (
+          // Voile sur le fil : un tap à côté referme le panneau.
+          <button
+            type="button"
+            aria-label="Fermer le panneau"
+            className="absolute inset-0 z-10 bg-foreground/20 xl:hidden"
+            onClick={() => setPanelOpen(false)}
+          />
+        )}
 
         <aside
           id={panelId}

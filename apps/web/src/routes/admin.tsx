@@ -29,13 +29,14 @@ function AdminLayout() {
           <Button
             variant="ghost"
             size="sm"
+            aria-label="Se déconnecter"
             onClick={async () => {
               await api('/api/admin/logout', { body: {} })
               await navigate({ to: '/admin/login' })
             }}
           >
             <LogOut />
-            Se déconnecter
+            <span className="hidden sm:inline">Se déconnecter</span>
           </Button>
         </div>
       </header>
