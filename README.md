@@ -41,6 +41,20 @@ curl -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
 # → { "link": "https://ask.tnemelc.fr/r/…", … }
 ```
 
+### Serveur MCP
+
+`https://ask.tnemelc.fr/mcp` (HTTP « streamable ») expose toute l'administration en outils :
+`list_forms`, `get_form`, `create_form`, `update_form`, `delete_form`, `create_respondent`,
+`update_respondent`, `delete_respondent`, `reopen_respondent`, `get_respondent`,
+`get_answers`, `set_answer`. Code : `apps/api/src/mcp.ts`.
+
+- **Claude Code** : jeton d'API en en-tête.
+  `claude mcp add --transport http -s user questionnaire https://ask.tnemelc.fr/mcp -H 'Authorization: Bearer ${PERSO_QUESTIONNAIRE_API_TOKEN}'`
+- **claude.ai** (web et mobile) : Réglages → Connecteurs → Ajouter un connecteur
+  personnalisé, adresse `https://ask.tnemelc.fr/mcp`. La connexion passe par OAuth : une page
+  demande le mot de passe admin (`apps/api/src/oauth.ts`). Changer `ADMIN_PASSWORD` révoque
+  tous les accès OAuth.
+
 Depuis l'admin, on peut aussi ouvrir http://localhost:5190/admin, choisir un questionnaire, créer un répondant,
 puis « Copier le lien » ou « Préparer le mail ». Ce dernier ouvre un brouillon dans votre
 messagerie (`mailto:`) : l'application n'envoie jamais de mail elle-même.
