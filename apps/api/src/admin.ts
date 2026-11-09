@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { answers, type Db, forms, respondents } from '@askly/db'
 import { and, count, desc, eq } from 'drizzle-orm'
+import { type Account, assertActive, assertFeature } from './accounts.ts'
 import { visibleMessages } from './ai.ts'
 import {
   type Answers,
@@ -30,23 +31,25 @@ import { loadAnswers, loadMessages, saveAnswer } from './store.ts'
 
 export { HttpError }
 
-export async function formOrThrow(db: Db, id: string): Promise<StoredForm> {
-  const form = await getForm(db, id)
+export async function formOrThrow(db: Db, accountId: string, id: string): Promise<StoredForm> {
+  const form = await getForm(db, accountId, id)
   if (!form) throw new HttpError(404, `Questionnaire introuvable : ${id}`)
   return form
 }
 
-async function respondentOrThrow(db: Db, id: string) {
-  const respondent = await db.query.respondents.findFirst({ where: eq(respondents.id, id) })
+async function respondentOrThrow(db: Db, accountId: string, id: string) {
+  const respondent = await db.query.respondents.findFirst({
+    where: and(eq(respondents.id, id), eq(respondents.accountId, accountId)),
+  })
   if (!respondent) throw new HttpError(404, `Répondant introuvable : ${id}`)
   return respondent
 }
 
 export const linkFor = (origin: string, token: string) => `${origin}/r/${token}`
 
-export async function listFormSummaries(db: Db) {
-  const rows = await db.select().from(respondents)
-  return (await listForms(db)).map((form) => {
+export async function listFormSummaries(db: Db, accountId: string) {
+  const rows = await db.select().from(respondents).where(eq(respondents.accountId, accountId))
+  return (await listForms(db, accountId)).map((form) => {
     const statuses = rows.filter((r) => r.formId === form.id).map(respondentStatus)
     return {
       id: form.id,
@@ -61,12 +64,12 @@ export async function listFormSummaries(db: Db) {
   })
 }
 
-export async function listRespondents(db: Db, form: Form, origin: string) {
+export async function listRespondents(db: Db, accountId: string, form: Form, origin: string) {
   const rows = await db
     .select({ respondent: respondents, answered: count(answers.questionId) })
     .from(respondents)
     .leftJoin(answers, eq(answers.respondentId, respondents.id))
-    .where(eq(respondents.formId, form.id))
+    .where(and(eq(respondents.accountId, accountId), eq(respondents.formId, form.id)))
     .groupBy(respondents.id)
     .orderBy(desc(respondents.createdAt))
   return rows.map(({ respondent, answered }) => ({
@@ -83,12 +86,14 @@ export async function listRespondents(db: Db, form: Form, origin: string) {
  */
 export async function putForm(
   db: Db,
+  account: Account,
   id: string,
   definition: unknown,
   reusable: boolean | undefined,
   mode: 'create' | 'update' | 'upsert',
 ) {
-  const existing = await getForm(db, id)
+  assertActive(account)
+  const existing = await getForm(db, account.id, id)
   if (mode === 'create' && existing) throw new HttpError(409, `Le questionnaire ${id} existe déjà`)
   if (mode === 'update' && !existing) throw new HttpError(404, `Questionnaire introuvable : ${id}`)
   let form: Form
@@ -97,20 +102,27 @@ export async function putForm(
   } catch (err) {
     throw new HttpError(400, err instanceof Error ? err.message : 'Questionnaire invalide')
   }
-  const { created } = await saveForm(db, form, reusable ?? existing?.reusable ?? true)
+  if (allQuestions(form).some((q) => q.type === 'file')) assertFeature(account, 'files')
+  const { created } = await saveForm(db, account.id, form, reusable ?? existing?.reusable ?? true)
   return { id: form.id, created, questionCount: allQuestions(form).length }
 }
 
 /** Supprime le questionnaire et ses répondants (réponses et conversations suivent, en cascade). */
-export async function deleteForm(db: Db, storage: Storage | undefined, id: string) {
-  const form = await formOrThrow(db, id)
-  const ids = (
-    await db.select({ id: respondents.id }).from(respondents).where(eq(respondents.formId, form.id))
-  ).map((r) => r.id)
+export async function deleteForm(
+  db: Db,
+  storage: Storage | undefined,
+  accountId: string,
+  id: string,
+) {
+  const form = await formOrThrow(db, accountId, id)
+  const ofForm = and(eq(respondents.accountId, accountId), eq(respondents.formId, form.id))
+  const ids = (await db.select({ id: respondents.id }).from(respondents).where(ofForm)).map(
+    (r) => r.id,
+  )
   const keys = await keysOfRespondents(db, ids)
   const deletedRespondents = await db.transaction(async (tx) => {
-    const gone = await tx.delete(respondents).where(eq(respondents.formId, form.id)).returning()
-    await tx.delete(forms).where(eq(forms.id, form.id))
+    const gone = await tx.delete(respondents).where(ofForm).returning()
+    await tx.delete(forms).where(and(eq(forms.accountId, accountId), eq(forms.id, form.id)))
     return gone.length
   })
   // Fichiers joints : les lignes sont parties en cascade, on efface les objets S3.
@@ -120,15 +132,22 @@ export async function deleteForm(db: Db, storage: Storage | undefined, id: strin
 
 export async function createRespondent(
   db: Db,
+  account: Account,
   formId: string,
   input: { name: string; email?: string | undefined },
   origin: string,
 ) {
-  const form = await formOrThrow(db, formId)
+  assertActive(account)
+  const form = await formOrThrow(db, account.id, formId)
   const [created] = await db
     .insert(respondents)
     // 32 octets aléatoires : le lien est le seul secret du répondant.
-    .values({ ...input, formId: form.id, token: randomBytes(32).toString('base64url') })
+    .values({
+      ...input,
+      accountId: account.id,
+      formId: form.id,
+      token: randomBytes(32).toString('base64url'),
+    })
     .returning()
   if (!created) throw new HttpError(500, 'Création impossible')
   return { ...created, status: respondentStatus(created), link: linkFor(origin, created.token) }
@@ -136,11 +155,12 @@ export async function createRespondent(
 
 export async function updateRespondent(
   db: Db,
+  accountId: string,
   id: string,
   input: { name?: string | undefined; email?: string | null | undefined },
   origin: string,
 ) {
-  const current = await respondentOrThrow(db, id)
+  const current = await respondentOrThrow(db, accountId, id)
   const changes = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined))
   const [row] = Object.keys(changes).length
     ? await db.update(respondents).set(changes).where(eq(respondents.id, id)).returning()
@@ -149,8 +169,13 @@ export async function updateRespondent(
   return { respondentId: r.id, name: r.name, email: r.email, link: linkFor(origin, r.token) }
 }
 
-export async function deleteRespondent(db: Db, storage: Storage | undefined, id: string) {
-  const r = await respondentOrThrow(db, id)
+export async function deleteRespondent(
+  db: Db,
+  storage: Storage | undefined,
+  accountId: string,
+  id: string,
+) {
+  const r = await respondentOrThrow(db, accountId, id)
   const keys = await keysOfRespondents(db, [id])
   await db.delete(respondents).where(eq(respondents.id, id))
   if (keys.length) await storage?.remove(keys)
@@ -158,8 +183,8 @@ export async function deleteRespondent(db: Db, storage: Storage | undefined, id:
 }
 
 /** Rouvre des réponses envoyées : le répondant peut de nouveau discuter et corriger. */
-export async function reopenRespondent(db: Db, id: string) {
-  await respondentOrThrow(db, id)
+export async function reopenRespondent(db: Db, accountId: string, id: string) {
+  await respondentOrThrow(db, accountId, id)
   const [row] = await db
     .update(respondents)
     .set({ submittedAt: null })
@@ -168,9 +193,9 @@ export async function reopenRespondent(db: Db, id: string) {
   return { id, status: row ? respondentStatus(row) : 'not_started' }
 }
 
-export async function getRespondentDetail(db: Db, id: string, origin: string) {
-  const respondent = await respondentOrThrow(db, id)
-  const form = await formOrThrow(db, respondent.formId)
+export async function getRespondentDetail(db: Db, accountId: string, id: string, origin: string) {
+  const respondent = await respondentOrThrow(db, accountId, id)
+  const form = await formOrThrow(db, accountId, respondent.formId)
   return {
     respondent: {
       ...respondent,
@@ -188,12 +213,13 @@ export async function getRespondentDetail(db: Db, id: string, origin: string) {
 export async function setAnswer(
   db: Db,
   storage: Storage | undefined,
+  accountId: string,
   respondentId: string,
   questionId: string,
   value: unknown,
 ) {
-  const respondent = await respondentOrThrow(db, respondentId)
-  const form = await formOrThrow(db, respondent.formId)
+  const respondent = await respondentOrThrow(db, accountId, respondentId)
+  const form = await formOrThrow(db, accountId, respondent.formId)
   const question = allQuestions(form).find((q) => q.id === questionId)
   if (question?.type === 'file') {
     // Pour une question `file`, on ne peut que retirer des fichiers (ou tout effacer avec null).
@@ -224,14 +250,15 @@ export async function setAnswer(
 }
 
 /** Réponses de tous les répondants d'un questionnaire (valeurs brutes, clés = id des questions). */
-export async function exportAnswers(db: Db, form: Form) {
-  const rows = await db.select().from(respondents).where(eq(respondents.formId, form.id))
+export async function exportAnswers(db: Db, accountId: string, form: Form) {
+  const ofForm = and(eq(respondents.accountId, accountId), eq(respondents.formId, form.id))
+  const rows = await db.select().from(respondents).where(ofForm)
   const all = (
     await db
       .select({ a: answers })
       .from(answers)
       .innerJoin(respondents, eq(answers.respondentId, respondents.id))
-      .where(eq(respondents.formId, form.id))
+      .where(ofForm)
   ).map((r) => r.a)
   const filesById = await respondentFiles(
     db,

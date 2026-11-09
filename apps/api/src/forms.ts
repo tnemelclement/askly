@@ -3,7 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Db } from '@askly/db'
 import { forms } from '@askly/db'
-import { desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import { parse } from 'yaml'
 import { z } from 'zod'
 import { FORM_ID, type Form, formSchema } from './domain.ts'
@@ -35,13 +35,13 @@ export function readFormFiles(dir = FORMS_DIR): Form[] {
     .map((f) => parseForm(f.replace(/\.ya?ml$/, ''), fs.readFileSync(path.join(dir, f), 'utf8')))
 }
 
-/** Importe les YAML absents de la base ; ne touche jamais un questionnaire déjà en base. */
-export async function seedForms(db: Db, dir = FORMS_DIR): Promise<number> {
+/** Importe les YAML absents du compte ; ne touche jamais un questionnaire déjà en base. */
+export async function seedForms(db: Db, accountId: string, dir = FORMS_DIR): Promise<number> {
   const files = readFormFiles(dir)
   if (files.length === 0) return 0
   const rows = await db
     .insert(forms)
-    .values(files.map(({ id, ...definition }) => ({ id, definition })))
+    .values(files.map(({ id, ...definition }) => ({ accountId, id, definition })))
     .onConflictDoNothing()
     .returning({ id: forms.id })
   return rows.length
@@ -51,15 +51,16 @@ export type StoredForm = Form & { reusable: boolean }
 
 export async function saveForm(
   db: Db,
+  accountId: string,
   form: Form,
   reusable: boolean,
 ): Promise<{ created: boolean }> {
   const { id, ...definition } = form
   const [row] = await db
     .insert(forms)
-    .values({ id, definition, reusable })
+    .values({ accountId, id, definition, reusable })
     .onConflictDoUpdate({
-      target: forms.id,
+      target: [forms.accountId, forms.id],
       set: { definition, reusable, updatedAt: sql`now()` },
     })
     // `xmax = 0` : la ligne vient d'être insérée, pas mise à jour.
@@ -68,12 +69,22 @@ export async function saveForm(
 }
 
 // Revalidé à la lecture : le format a pu évoluer depuis l'écriture.
-export async function listForms(db: Db): Promise<StoredForm[]> {
-  const rows = await db.select().from(forms).orderBy(desc(forms.updatedAt))
+export async function listForms(db: Db, accountId: string): Promise<StoredForm[]> {
+  const rows = await db
+    .select()
+    .from(forms)
+    .where(eq(forms.accountId, accountId))
+    .orderBy(desc(forms.updatedAt))
   return rows.map((r) => ({ ...parseForm(r.id, r.definition), reusable: r.reusable }))
 }
 
-export async function getForm(db: Db, id: string): Promise<StoredForm | undefined> {
-  const row = await db.query.forms.findFirst({ where: eq(forms.id, id) })
+export async function getForm(
+  db: Db,
+  accountId: string,
+  id: string,
+): Promise<StoredForm | undefined> {
+  const row = await db.query.forms.findFirst({
+    where: and(eq(forms.accountId, accountId), eq(forms.id, id)),
+  })
   return row && { ...parseForm(row.id, row.definition), reusable: row.reusable }
 }

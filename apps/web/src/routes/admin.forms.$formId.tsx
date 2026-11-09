@@ -1,7 +1,7 @@
 import { allQuestions, type Form, type RespondentStatus, STATUS_LABELS } from '@askly/api/domain'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { ArrowLeft, Copy, Download, Eye, Mail, UserPlus } from 'lucide-react'
+import { ArrowLeft, Copy, Download, Eye, Mail, Pencil, UserPlus } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -89,6 +89,12 @@ function FormPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/admin/edit" search={{ id: formId }}>
+              <Pencil />
+              Modifier
+            </Link>
+          </Button>
           <Button variant="outline" size="sm" asChild>
             <a href={`/api/admin/forms/${formId}/export?format=csv`} download>
               <Download />

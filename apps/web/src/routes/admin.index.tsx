@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Plus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api'
 
@@ -26,16 +27,19 @@ function FormsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <h1 className="text-2xl font-semibold tracking-tight">Questionnaires</h1>
-        <p className="text-sm text-muted-foreground">
-          Définis dans le dossier <code className="font-mono">forms/</code> du dépôt.
-        </p>
+        <Button asChild>
+          <Link to="/admin/edit">
+            <Plus />
+            Nouveau questionnaire
+          </Link>
+        </Button>
       </div>
       {forms.isError && <p className="text-sm text-destructive">{forms.error.message}</p>}
       {forms.data?.length === 0 && (
         <p className="text-sm text-muted-foreground">
-          Aucun questionnaire : ajoutez un fichier YAML dans forms/.
+          Aucun questionnaire pour l’instant : créez le premier, l’IA peut le rédiger pour vous.
         </p>
       )}
       <div className="grid gap-4 sm:grid-cols-2">

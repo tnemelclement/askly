@@ -12,18 +12,51 @@ import {
 } from 'drizzle-orm/pg-core'
 
 /**
+ * Compte client (SaaS) ou propriétaire de l'instance (auto-hébergé, plan `unlimited`).
+ * Tout le reste (questionnaires, répondants, fichiers) appartient à un compte.
+ */
+export const accounts = pgTable('accounts', {
+  id: uuid().primaryKey().default(sql`gen_random_uuid()`),
+  /** En minuscules. */
+  email: text().notNull().unique(),
+  /** scrypt, format `sel:empreinte` en hexadécimal ; vide = connexion impossible. */
+  passwordHash: text().notNull(),
+  plan: text({ enum: ['trial', 'solo', 'pro', 'unlimited'] })
+    .notNull()
+    .default('trial'),
+  trialEndsAt: timestamp({ withTimezone: true }),
+  stripeCustomerId: text().unique(),
+  /** Statut Stripe de l'abonnement (active, past_due, canceled…) ; null hors abonnement. */
+  subscriptionStatus: text(),
+  /** SHA-256 du jeton d'API (serveur MCP depuis Claude Code), jamais le jeton lui-même. */
+  apiTokenHash: text().unique(),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+})
+
+const accountId = () =>
+  uuid()
+    .notNull()
+    .references(() => accounts.id, { onDelete: 'cascade' })
+
+/**
  * Un questionnaire : sa définition (titre, sections, questions) validée par `formSchema` de
  * l'API avant d'entrer ici. Créé par l'API admin (le skill de Claude) ou importé des YAML
  * de `forms/` au démarrage.
  */
-export const forms = pgTable('forms', {
-  id: text().primaryKey(),
-  definition: jsonb().$type<unknown>().notNull(),
-  /** `false` = questionnaire ponctuel, écrit pour une seule personne. */
-  reusable: boolean().notNull().default(true),
-  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
-})
+export const forms = pgTable(
+  'forms',
+  {
+    accountId: accountId(),
+    /** Unique par compte : deux clients peuvent avoir chacun leur « projet-cuisine ». */
+    id: text().notNull(),
+    definition: jsonb().$type<unknown>().notNull(),
+    /** `false` = questionnaire ponctuel, écrit pour une seule personne. */
+    reusable: boolean().notNull().default(true),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.accountId, t.id] })],
+)
 
 /**
  * Un répondant = une personne invitée à remplir un questionnaire (`forms/<formId>.yaml`),
@@ -32,6 +65,7 @@ export const forms = pgTable('forms', {
  */
 export const respondents = pgTable('respondents', {
   id: uuid().primaryKey().default(sql`gen_random_uuid()`),
+  accountId: accountId(),
   token: text().notNull().unique(),
   formId: text().notNull(),
   name: text().notNull(),
@@ -86,6 +120,7 @@ export const files = pgTable(
   'files',
   {
     id: uuid().primaryKey().default(sql`gen_random_uuid()`),
+    accountId: accountId(),
     kind: text({ enum: ['image', 'upload'] }).notNull(),
     respondentId: uuid().references(() => respondents.id, { onDelete: 'cascade' }),
     questionId: text(),

@@ -117,7 +117,7 @@ export async function addRespondentFile(
   db: Db,
   storage: Storage | undefined,
   form: Form,
-  respondentId: string,
+  respondent: { id: string; accountId: string },
   questionId: string,
   upload: Upload,
 ) {
@@ -125,6 +125,7 @@ export async function addRespondentFile(
   const question = allQuestions(form).find((q) => q.id === questionId)
   if (question?.type !== 'file') throw new HttpError(400, `${questionId} n'attend pas de fichier`)
   checkUpload(upload, ALLOWED_UPLOAD_TYPES)
+  const respondentId = respondent.id
   const current = (await loadAnswers(db, respondentId))[questionId]
   const ids = Array.isArray(current) ? current : []
   if (ids.length >= MAX_FILES_PER_QUESTION) {
@@ -136,6 +137,7 @@ export async function addRespondentFile(
     .insert(files)
     .values({
       kind: 'upload',
+      accountId: respondent.accountId,
       respondentId,
       questionId,
       key,
@@ -153,6 +155,7 @@ export async function addRespondentFile(
 export async function addImage(
   db: Db,
   storage: Storage | undefined,
+  accountId: string,
   upload: Upload,
   origin: string,
 ) {
@@ -164,6 +167,7 @@ export async function addImage(
     .insert(files)
     .values({
       kind: 'image',
+      accountId,
       key,
       filename: upload.filename.slice(0, 255),
       contentType: upload.contentType,
@@ -174,8 +178,11 @@ export async function addImage(
   return { ...info(row), url: `${origin}/api/images/${row.id}` }
 }
 
-export async function findFile(db: Db, id: string) {
-  const row = await db.query.files.findFirst({ where: eq(files.id, id) })
+/** Fichier par id ; avec `accountId`, seulement s'il appartient à ce compte. */
+export async function findFile(db: Db, id: string, accountId?: string) {
+  const row = await db.query.files.findFirst({
+    where: accountId ? and(eq(files.id, id), eq(files.accountId, accountId)) : eq(files.id, id),
+  })
   if (!row) throw new HttpError(404, 'Fichier introuvable')
   return row
 }

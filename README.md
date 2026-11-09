@@ -1,6 +1,7 @@
 # Askly
 
-Questionnaires conversationnels assistés par IA. Le client ouvre son lien `/r/<token>` et
+Questionnaires conversationnels assistés par IA. Logiciel libre (MIT), à héberger soi-même,
+ou en service hébergé sur [askly.tnemelc.fr](https://askly.tnemelc.fr). Le client ouvre son lien `/r/<token>` et
 répond dans un chat : l'assistant pose les questions une à une, explique quand on lui
 demande des précisions, et remplit au fur et à mesure le panneau « Vos réponses »
 (à droite, corrigeable à la main). Un bouton « Envoyer mes réponses » verrouille le tout.
@@ -16,11 +17,18 @@ Monorepo pnpm + turbo, Biome, TypeScript strict :
 
 ```sh
 pnpm install
-cp .env.example .env        # puis renseigner ANTHROPIC_API_KEY et ADMIN_PASSWORD
+cp .env.example .env        # puis renseigner ANTHROPIC_API_KEY, ADMIN_EMAIL et ADMIN_PASSWORD
 docker compose up -d        # Postgres sur le port 5436
 pnpm db:migrate
 pnpm dev                    # API sur :3400, front sur http://localhost:5190
 ```
+
+## Comptes et abonnements
+
+Chaque questionnaire appartient à un compte. Une instance auto-hébergée n'a que le compte
+propriétaire (`ADMIN_EMAIL` / `ADMIN_PASSWORD`, sans limite). Le service hébergé ouvre
+l'inscription (`SIGNUP=true`) : essai de 14 jours, puis offres Solo et Pro payées par Stripe
+(`STRIPE_*`), avec un quota de réponses par mois (`apps/api/src/accounts.ts`).
 
 ## Créer un questionnaire
 
@@ -69,8 +77,8 @@ Postgres 18 à côté, migrations au démarrage. Chaque push sur `main` qui touc
 `packages/`, `forms/` ou le `Dockerfile` redéploie. Créer un questionnaire, lui, ne demande aucun
 push : voir « Créer un questionnaire ».
 
-Les variables de prod (`DATABASE_URL`, `ANTHROPIC_API_KEY`, `ADMIN_PASSWORD`,
-`ADMIN_API_TOKEN`, `PUBLIC_URL`, `NODE_ENV=production`) sont dans Dokploy ; copie des
+Les variables de prod (`DATABASE_URL`, `ANTHROPIC_API_KEY`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`,
+`ADMIN_API_TOKEN`, `SIGNUP`, `PUBLIC_URL`, `NODE_ENV=production`, plus tard `STRIPE_*`) sont dans Dokploy ; copie des
 secrets dans le coffre iCloud (`Secrets/repos/askly/.env.production`).
 
 ## Variables d'environnement (`.env` à la racine, jamais versionné)
@@ -79,8 +87,11 @@ secrets dans le coffre iCloud (`Secrets/repos/askly/.env.production`).
 | --- | --- |
 | `DATABASE_URL` | Connexion Postgres (celle du `docker-compose.yml` par défaut). |
 | `ANTHROPIC_API_KEY` | Clé de l'API Anthropic. |
-| `ADMIN_PASSWORD` | Mot de passe de `/admin` (8 caractères minimum). Le changer déconnecte toutes les sessions. |
-| `ADMIN_API_TOKEN` | Jeton (32 caractères min.) pour l'API admin en `Bearer`, utilisée par le skill. Absent : API admin par cookie seulement. |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Compte propriétaire (illimité), recréé ou mis à jour à chaque démarrage ; reçoit les YAML de `forms/`. |
+| `SECRET_KEY` | Signature des sessions et jetons OAuth (32 caractères min.) ; à défaut, dérivée d'`ADMIN_PASSWORD`. La changer déconnecte tout le monde. |
+| `ADMIN_API_TOKEN` | Jeton (32 caractères min.) du propriétaire pour l'API admin en `Bearer`. Chaque compte peut aussi créer le sien dans « Mon compte ». |
+| `SIGNUP` | `true` : inscription ouverte (service hébergé). |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_SOLO`, `STRIPE_PRICE_PRO` | Abonnements ; absents, le paiement est désactivé. |
 | `PUBLIC_URL` | Adresse publique (ex. `https://ask.tnemelc.fr`) pour les liens renvoyés ; sinon déduite de la requête. |
 | `API_PORT`, `WEB_PORT` | Ports de dev (3400 et 5190 par défaut). Le front relaie `/api` vers l'API. |
 

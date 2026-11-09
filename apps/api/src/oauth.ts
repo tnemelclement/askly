@@ -6,10 +6,10 @@ import { z } from 'zod'
  * Serveur d'autorisation OAuth 2.1 minimal pour le connecteur MCP de claude.ai : découverte
  * (RFC 8414, RFC 9728), enregistrement dynamique des clients (RFC 7591), code
  * d'autorisation avec PKCE S256, jeton de rafraîchissement. L'utilisateur se connecte avec
- * le mot de passe admin.
+ * l'e-mail et le mot de passe de son compte ; les jetons portent l'id du compte (`acc`).
  *
- * Sans état : client_id, codes et jetons sont des charges utiles signées (HMAC dérivé
- * d'ADMIN_PASSWORD). Changer le mot de passe révoque donc tout.
+ * Sans état : client_id, codes et jetons sont des charges utiles signées (HMAC dérivé de
+ * SECRET_KEY, à défaut d'ADMIN_PASSWORD). Changer ce secret révoque donc tout.
  * shortcut: un code d'autorisation n'est pas à usage unique (il expire en 5 min, et PKCE exige le code_verifier) ; stocker les codes consommés en base si on veut l'interdire.
  */
 
@@ -53,8 +53,11 @@ export function createSigner(secret: string): Signer {
   }
 }
 
-export function verifyAccessToken(signer: Signer, token: string): boolean {
-  return signer.verify(token, 'access') !== null
+/** Id du compte du jeton, ou `null`. Les jetons d'avant les comptes valent pour le propriétaire. */
+export function verifyAccessToken(signer: Signer, token: string, ownerId: string): string | null {
+  const payload = signer.verify(token, 'access')
+  if (!payload) return null
+  return typeof payload.acc === 'string' ? payload.acc : ownerId
 }
 
 /** Retours de connexion acceptés : claude.ai / claude.com, et la machine locale (Claude Code). */
@@ -73,19 +76,22 @@ export function pkceMatches(verifier: string, challenge: string): boolean {
 }
 
 /**
- * Freine la force brute sur le mot de passe : 10 échecs par quart d'heure, toutes IP
- * confondues (il n'y a qu'un administrateur).
- * shortcut: compteur en mémoire, par instance ; le mettre en base si l'API tourne en plusieurs exemplaires.
+ * Freine la force brute : 10 échecs par quart d'heure et par clé (l'e-mail visé, l'IP).
+ * shortcut: compteurs en mémoire, par instance ; les mettre en base si l'API tourne en plusieurs exemplaires.
  */
 export function createLoginLimiter(max = 10, windowMs = 15 * 60 * 1000) {
-  let failures: number[] = []
+  const failures = new Map<string, number[]>()
+  const recent = (key: string) => (failures.get(key) ?? []).filter((t) => t > Date.now() - windowMs)
   return {
-    blocked() {
-      failures = failures.filter((t) => t > Date.now() - windowMs)
-      return failures.length >= max
+    blocked(...keys: string[]) {
+      return keys.some((k) => recent(k).length >= max)
     },
-    fail() {
-      failures.push(Date.now())
+    fail(...keys: string[]) {
+      for (const k of keys) failures.set(k, [...recent(k), Date.now()])
+      // Garde la mémoire bornée : on oublie les clés sans échec récent.
+      if (failures.size > 10_000) {
+        for (const k of failures.keys()) if (recent(k).length === 0) failures.delete(k)
+      }
     },
   }
 }
@@ -121,16 +127,18 @@ body{margin:0;min-height:100dvh;display:grid;place-items:center;background:#f4f4
 main{width:min(380px,calc(100vw - 32px));background:#fff;border:1px solid #e6e6e3;border-radius:11px;padding:28px;box-shadow:0 1px 2px #0000000a,0 4px 16px #0000000a}
 h1{font-size:20px;letter-spacing:-.02em;margin:0 0 6px}p{color:#6e6e6b;margin:0 0 20px}
 label{display:block;font-size:13px;font-weight:500;margin-bottom:6px}
-input[type=password]{box-sizing:border-box;width:100%;height:40px;border:1px solid #e6e6e3;border-radius:8px;padding:0 14px;font:inherit}
-input[type=password]:focus{outline:none;border-color:#0b0b0c}
+input[type=password],input[type=email]{box-sizing:border-box;width:100%;height:40px;border:1px solid #e6e6e3;border-radius:8px;padding:0 14px;font:inherit}
+input:focus{outline:none;border-color:#0b0b0c}
 button{margin-top:16px;width:100%;height:40px;border:0;border-radius:8px;background:#0b0b0c;color:#fff;font:inherit;font-weight:500;cursor:pointer}
 button:hover{opacity:.85}.error{color:#c4321f;font-size:13px;margin:8px 0 0}
 </style></head><body><main>
 <h1>Autoriser ${escapeHtml(clientName)}</h1>
 <p>Accès complet à vos questionnaires Askly : création, liens, réponses.</p>
 <form method="post" action="/oauth/authorize">${hidden}
-<label for="password">Mot de passe administrateur</label>
-<input id="password" name="password" type="password" autocomplete="current-password" autofocus required>
+<label for="email">E-mail</label>
+<input id="email" name="email" type="email" autocomplete="email" autofocus required>
+<label for="password" style="margin-top:12px">Mot de passe</label>
+<input id="password" name="password" type="password" autocomplete="current-password" required>
 ${error ? `<p class="error" role="alert">${escapeHtml(error)}</p>` : ''}
 <button type="submit">Autoriser</button>
 </form></main></body></html>`
@@ -139,14 +147,14 @@ ${error ? `<p class="error" role="alert">${escapeHtml(error)}</p>` : ''}
 export function registerOAuth(
   app: FastifyInstance,
   opts: {
-    adminPassword: string
     origin: (req: FastifyRequest) => string
     signer: Signer
-    safeEqual: (a: string, b: string) => boolean
+    /** Id du compte si l'e-mail et le mot de passe sont bons, sinon `null`. */
+    authenticate: (email: string, password: string) => Promise<string | null>
     limiter: ReturnType<typeof createLoginLimiter>
   },
 ) {
-  const { signer, origin, safeEqual, limiter } = opts
+  const { signer, origin, limiter } = opts
 
   app.addContentTypeParser(
     'application/x-www-form-urlencoded',
@@ -239,14 +247,19 @@ export function registerOAuth(
     if (!ok) return reply
     const html = (error: string) =>
       reply.type('text/html; charset=utf-8').send(loginPage(ok.params, ok.client.name, error))
-    if (limiter.blocked()) return html('Trop de tentatives. Réessayez dans un quart d’heure.')
-    if (!safeEqual(body.password ?? '', opts.adminPassword)) {
-      limiter.fail()
-      return html('Mot de passe incorrect.')
+    const email = (body.email ?? '').trim().toLowerCase().slice(0, 320)
+    if (limiter.blocked(email, req.ip)) {
+      return html('Trop de tentatives. Réessayez dans un quart d’heure.')
+    }
+    const acc = await opts.authenticate(email, (body.password ?? '').slice(0, 200))
+    if (!acc) {
+      limiter.fail(email, req.ip)
+      return html('E-mail ou mot de passe incorrect.')
     }
     const code = signer.sign(
       {
         typ: 'code',
+        acc,
         cid: ok.params.client_id,
         ru: ok.params.redirect_uri,
         cc: ok.params.code_challenge,
@@ -266,6 +279,7 @@ export function registerOAuth(
     reply.header('cache-control', 'no-store')
 
     let clientId: string
+    let acc: unknown
     if (body.grant_type === 'authorization_code') {
       const code = signer.verify(body.code ?? '', 'code')
       if (!code) return fail('invalid_grant', 'code invalide ou expiré')
@@ -276,18 +290,20 @@ export function registerOAuth(
         return fail('invalid_grant', 'code_verifier invalide')
       }
       clientId = String(code.cid)
+      acc = code.acc
     } else if (body.grant_type === 'refresh_token') {
       const refresh = signer.verify(body.refresh_token ?? '', 'refresh')
       if (!refresh) return fail('invalid_grant', 'refresh_token invalide ou expiré')
       clientId = String(refresh.cid)
+      acc = refresh.acc
     } else {
       return fail('unsupported_grant_type')
     }
     return {
-      access_token: signer.sign({ typ: 'access', cid: clientId }, ACCESS_TTL),
+      access_token: signer.sign({ typ: 'access', cid: clientId, acc }, ACCESS_TTL),
       token_type: 'Bearer',
       expires_in: ACCESS_TTL,
-      refresh_token: signer.sign({ typ: 'refresh', cid: clientId }, REFRESH_TTL),
+      refresh_token: signer.sign({ typ: 'refresh', cid: clientId, acc }, REFRESH_TTL),
       scope: 'questionnaires',
     }
   })

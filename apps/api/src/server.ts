@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { createDb } from '@askly/db'
 import { z } from 'zod'
+import { ensureOwner, OWNER_ID } from './accounts.ts'
 import { buildApp } from './app.ts'
 import { seedForms } from './forms.ts'
 import { createStorage } from './storage.ts'
@@ -9,7 +10,17 @@ const env = z
   .object({
     DATABASE_URL: z.string().min(1),
     ANTHROPIC_API_KEY: z.string().min(1),
-    ADMIN_PASSWORD: z.string().min(8, 'ADMIN_PASSWORD : 8 caractères minimum'),
+    // Propriétaire de l'instance (plan illimité) ; les deux ensemble.
+    ADMIN_EMAIL: z.email().optional(),
+    ADMIN_PASSWORD: z.string().min(8, 'ADMIN_PASSWORD : 8 caractères minimum').optional(),
+    // Clé de signature des sessions et jetons OAuth ; à défaut, dérivée d'ADMIN_PASSWORD.
+    SECRET_KEY: z.string().min(32, 'SECRET_KEY : 32 caractères minimum').optional(),
+    // SaaS : inscription ouverte et abonnements Stripe (les quatre ensemble).
+    SIGNUP: z.stringbool().default(false),
+    STRIPE_SECRET_KEY: z.string().optional(),
+    STRIPE_WEBHOOK_SECRET: z.string().optional(),
+    STRIPE_PRICE_SOLO: z.string().optional(),
+    STRIPE_PRICE_PRO: z.string().optional(),
     API_PORT: z.coerce.number().default(3400),
     // 0.0.0.0 dans le conteneur ; en local on reste sur la boucle.
     HOST: z.string().default('127.0.0.1'),
@@ -26,6 +37,34 @@ const env = z
     S3_CREATE_BUCKET: z.stringbool().default(false),
   })
   .parse(process.env)
+
+const secret = env.SECRET_KEY ?? env.ADMIN_PASSWORD
+if (!secret) throw new Error('SECRET_KEY (ou ADMIN_PASSWORD) requis')
+if (env.ADMIN_EMAIL && !env.ADMIN_PASSWORD) {
+  throw new Error('ADMIN_EMAIL et ADMIN_PASSWORD vont ensemble')
+}
+const stripe = [
+  env.STRIPE_SECRET_KEY,
+  env.STRIPE_WEBHOOK_SECRET,
+  env.STRIPE_PRICE_SOLO,
+  env.STRIPE_PRICE_PRO,
+]
+if (stripe.some(Boolean) && !stripe.every(Boolean)) {
+  throw new Error(
+    'STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_SOLO et STRIPE_PRICE_PRO vont ensemble',
+  )
+}
+const billing =
+  env.STRIPE_SECRET_KEY &&
+  env.STRIPE_WEBHOOK_SECRET &&
+  env.STRIPE_PRICE_SOLO &&
+  env.STRIPE_PRICE_PRO
+    ? {
+        secretKey: env.STRIPE_SECRET_KEY,
+        webhookSecret: env.STRIPE_WEBHOOK_SECRET,
+        prices: { solo: env.STRIPE_PRICE_SOLO, pro: env.STRIPE_PRICE_PRO },
+      }
+    : undefined
 
 const db = createDb(env.DATABASE_URL)
 
@@ -47,13 +86,19 @@ const storage =
     : undefined
 // En local seulement : le S3 du docker-compose démarre sans bucket.
 if (storage && env.S3_CREATE_BUCKET) await storage.ensureBucket()
-// Amorce une base neuve avec les YAML de forms/ ; un YAML invalide casse le démarrage.
-const seeded = await seedForms(db)
+// Le propriétaire reçoit les YAML de forms/ absents de son compte ; un YAML invalide casse le démarrage.
+let seeded = 0
+if (env.ADMIN_EMAIL && env.ADMIN_PASSWORD) {
+  await ensureOwner(db, env.ADMIN_EMAIL, env.ADMIN_PASSWORD)
+  seeded = await seedForms(db, OWNER_ID)
+}
 
 const app = buildApp({
   db,
   anthropic: new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }),
-  adminPassword: env.ADMIN_PASSWORD,
+  secret,
+  signup: env.SIGNUP,
+  billing,
   apiToken: env.ADMIN_API_TOKEN,
   publicUrl: env.PUBLIC_URL?.replace(/\/$/, ''),
   webDist: env.WEB_DIST,

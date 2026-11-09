@@ -1,16 +1,35 @@
 import { createHash } from 'node:crypto'
 import type Anthropic from '@anthropic-ai/sdk'
 import type { Db } from '@askly/db'
+import type { SQL } from 'drizzle-orm'
+import { PgDialect } from 'drizzle-orm/pg-core'
 import { describe, expect, it } from 'vitest'
+import { hashPassword, OWNER_ID } from './accounts.ts'
 import { buildApp } from './app.ts'
 import { isPrivateAddress } from './files.ts'
 import { createLoginLimiter, createSigner, isAllowedRedirect, pkceMatches } from './oauth.ts'
 
-// Ni base ni IA : ces tests ne couvrent que l'authentification et la découverte des outils.
+// Ni vraie base ni IA : ces tests ne couvrent que l'authentification et la découverte des outils.
+const owner = {
+  id: OWNER_ID,
+  email: 'owner@example.test',
+  plan: 'unlimited',
+  passwordHash: await hashPassword('mot-de-passe-de-test'),
+}
 const app = buildApp({
-  db: {} as Db,
+  // Seule requête faite : la recherche d'un compte, qui ne trouve que le propriétaire.
+  db: {
+    query: {
+      accounts: {
+        findFirst: async ({ where }: { where: SQL }) => {
+          const { params } = new PgDialect().sqlToQuery(where)
+          return [owner.id, owner.email].some((v) => params.includes(v)) ? owner : undefined
+        },
+      },
+    },
+  } as unknown as Db,
   anthropic: {} as Anthropic,
-  adminPassword: 'mot-de-passe-de-test',
+  secret: 'secret-de-test-'.repeat(3),
   apiToken: 'j'.repeat(40),
   publicUrl: 'https://ask.example.test',
 })
@@ -127,9 +146,9 @@ describe('OAuth', () => {
         method: 'POST',
         url: '/oauth/authorize',
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
-        payload: new URLSearchParams({ ...params, password }).toString(),
+        payload: new URLSearchParams({ ...params, email: owner.email, password }).toString(),
       })
-    expect((await post('mauvais')).body).toContain('Mot de passe incorrect')
+    expect((await post('mauvais')).body).toContain('mot de passe incorrect')
     const ok = await post('mot-de-passe-de-test')
     expect(ok.statusCode).toBe(302)
     const location = new URL(ok.headers.location as string)
@@ -197,10 +216,11 @@ describe('briques OAuth', () => {
 
   it('bloque après trop d’échecs', () => {
     const l = createLoginLimiter(2)
-    l.fail()
-    expect(l.blocked()).toBe(false)
-    l.fail()
-    expect(l.blocked()).toBe(true)
+    l.fail('a@x.fr', '1.2.3.4')
+    expect(l.blocked('a@x.fr')).toBe(false)
+    l.fail('a@x.fr')
+    expect(l.blocked('a@x.fr')).toBe(true)
+    expect(l.blocked('b@x.fr', '5.6.7.8')).toBe(false)
   })
 })
 

@@ -3,6 +3,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { z } from 'zod'
+import { type Account, assertFeature } from './accounts.ts'
 import {
   createRespondent,
   deleteForm,
@@ -36,7 +37,7 @@ import { IMAGE_TYPES, type Storage } from './storage.ts'
  * Authentification : jeton OAuth (connecteur claude.ai) ou ADMIN_API_TOKEN (Claude Code).
  */
 
-const INSTRUCTIONS = `Askly: conversational questionnaires hosted on ask.tnemelc.fr. A respondent opens their personal link and answers in a chat: an AI asks the questions one by one, explains them when asked, offers one-click answers and fills a side panel; they finally click "Send my answers", which locks the answers (status "done").
+export const INSTRUCTIONS = `Askly: conversational questionnaires hosted on ask.tnemelc.fr. A respondent opens their personal link and answers in a chat: an AI asks the questions one by one, explains them when asked, offers one-click answers and fills a side panel; they finally click "Send my answers", which locks the answers (status "done").
 
 Two kinds of questionnaires:
 - one-shot (reusable: false): written for a single person, e.g. questions about a client's project. Create the form, then one respondent.
@@ -72,7 +73,12 @@ async function run(fn: () => Promise<unknown>): Promise<ToolResult> {
   }
 }
 
-export function buildMcpServer(db: Db, origin: string, storage?: Storage): McpServer {
+export function buildMcpServer(
+  db: Db,
+  account: Account,
+  origin: string,
+  storage?: Storage,
+): McpServer {
   /** Fichiers joints avec un lien de téléchargement signé (1 h), utilisable sans connexion. */
   const fileLinks = (rows: FileRow[] | FileInfo[]) =>
     Promise.all(
@@ -102,7 +108,7 @@ export function buildMcpServer(db: Db, origin: string, storage?: Storage): McpSe
         'List all questionnaires with their kind (reusable or one-shot), question count and respondent counts by status.',
       annotations: { readOnlyHint: true },
     },
-    () => run(() => listFormSummaries(db)),
+    () => run(() => listFormSummaries(db, account.id)),
   )
 
   server.registerTool(
@@ -116,8 +122,8 @@ export function buildMcpServer(db: Db, origin: string, storage?: Storage): McpSe
     },
     ({ form_id }) =>
       run(async () => {
-        const form = await formOrThrow(db, form_id)
-        return { form, respondents: await listRespondents(db, form, origin) }
+        const form = await formOrThrow(db, account.id, form_id)
+        return { form, respondents: await listRespondents(db, account.id, form, origin) }
       }),
   )
 
@@ -139,7 +145,7 @@ export function buildMcpServer(db: Db, origin: string, storage?: Storage): McpSe
     },
     ({ form_id, reusable, definition }) =>
       run(async () => ({
-        ...(await putForm(db, form_id, definition, reusable, 'create')),
+        ...(await putForm(db, account, form_id, definition, reusable, 'create')),
         adminUrl: `${origin}/admin/forms/${form_id}`,
       })),
   )
@@ -161,8 +167,12 @@ export function buildMcpServer(db: Db, origin: string, storage?: Storage): McpSe
     },
     ({ form_id, definition, reusable }) =>
       run(async () => {
-        const { id: _id, reusable: current, ...existing } = await formOrThrow(db, form_id)
-        return putForm(db, form_id, definition ?? existing, reusable ?? current, 'update')
+        const {
+          id: _id,
+          reusable: current,
+          ...existing
+        } = await formOrThrow(db, account.id, form_id)
+        return putForm(db, account, form_id, definition ?? existing, reusable ?? current, 'update')
       }),
   )
 
@@ -175,7 +185,7 @@ export function buildMcpServer(db: Db, origin: string, storage?: Storage): McpSe
       inputSchema: { form_id: formId },
       annotations: { destructiveHint: true },
     },
-    ({ form_id }) => run(() => deleteForm(db, storage, form_id)),
+    ({ form_id }) => run(() => deleteForm(db, storage, account.id, form_id)),
   )
 
   server.registerTool(
@@ -201,7 +211,7 @@ export function buildMcpServer(db: Db, origin: string, storage?: Storage): McpSe
     },
     ({ form_id, name, email }) =>
       run(async () => {
-        const r = await createRespondent(db, form_id, { name, email }, origin)
+        const r = await createRespondent(db, account, form_id, { name, email }, origin)
         return { respondentId: r.id, name: r.name, email: r.email, status: r.status, link: r.link }
       }),
   )
@@ -219,7 +229,7 @@ export function buildMcpServer(db: Db, origin: string, storage?: Storage): McpSe
       annotations: { idempotentHint: true },
     },
     ({ respondent_id, name, email }) =>
-      run(() => updateRespondent(db, respondent_id, { name, email }, origin)),
+      run(() => updateRespondent(db, account.id, respondent_id, { name, email }, origin)),
   )
 
   server.registerTool(
@@ -231,7 +241,7 @@ export function buildMcpServer(db: Db, origin: string, storage?: Storage): McpSe
       inputSchema: { respondent_id: respondentId },
       annotations: { destructiveHint: true },
     },
-    ({ respondent_id }) => run(() => deleteRespondent(db, storage, respondent_id)),
+    ({ respondent_id }) => run(() => deleteRespondent(db, storage, account.id, respondent_id)),
   )
 
   server.registerTool(
@@ -243,7 +253,7 @@ export function buildMcpServer(db: Db, origin: string, storage?: Storage): McpSe
       inputSchema: { respondent_id: respondentId },
       annotations: { idempotentHint: true },
     },
-    ({ respondent_id }) => run(() => reopenRespondent(db, respondent_id)),
+    ({ respondent_id }) => run(() => reopenRespondent(db, account.id, respondent_id)),
   )
 
   server.registerTool(
@@ -260,7 +270,7 @@ export function buildMcpServer(db: Db, origin: string, storage?: Storage): McpSe
     },
     ({ respondent_id, include_conversation }) =>
       run(async () => {
-        const d = await getRespondentDetail(db, respondent_id, origin)
+        const d = await getRespondentDetail(db, account.id, respondent_id, origin)
         return {
           respondent: {
             id: d.respondent.id,
@@ -294,9 +304,9 @@ export function buildMcpServer(db: Db, origin: string, storage?: Storage): McpSe
     },
     ({ form_id, status }) =>
       run(async () => {
-        const form = await formOrThrow(db, form_id)
+        const form = await formOrThrow(db, account.id, form_id)
         return Promise.all(
-          (await exportAnswers(db, form))
+          (await exportAnswers(db, account.id, form))
             .filter((r) => status === 'all' || r.status === status)
             .map(async ({ respondent: r, status: s, answers, files }) => ({
               respondentId: r.id,
@@ -328,7 +338,7 @@ export function buildMcpServer(db: Db, origin: string, storage?: Storage): McpSe
       annotations: { idempotentHint: true },
     },
     ({ respondent_id, question_id, value }) =>
-      run(() => setAnswer(db, storage, respondent_id, question_id, value)),
+      run(() => setAnswer(db, storage, account.id, respondent_id, question_id, value)),
   )
 
   server.registerTool(
@@ -363,7 +373,7 @@ export function buildMcpServer(db: Db, origin: string, storage?: Storage): McpSe
           throw new HttpError(400, 'source_url ou content_base64 requis')
         }
         if (filename) upload.filename = filename
-        const image = await addImage(db, storage, upload, origin)
+        const image = await addImage(db, storage, account.id, upload, origin)
         return { url: image.url, filename: image.filename, size: image.size }
       }),
   )
@@ -380,7 +390,7 @@ export function buildMcpServer(db: Db, origin: string, storage?: Storage): McpSe
     async ({ file_id }) => {
       try {
         const s3 = requireStorage(storage)
-        const file = await findFile(db, file_id)
+        const file = await findFile(db, file_id, account.id)
         const meta = {
           fileId: file.id,
           filename: file.filename,
@@ -430,14 +440,16 @@ export function registerMcp(
     db: Db
     storage?: Storage | undefined
     origin: (req: FastifyRequest) => string
-    authorize: (req: FastifyRequest) => boolean
+    /** Compte du jeton présenté, ou `null`. */
+    authorize: (req: FastifyRequest) => Promise<Account | null>
   },
 ) {
   app.route({
     method: ['GET', 'POST', 'DELETE'],
     url: '/mcp',
     handler: async (req, reply) => {
-      if (!opts.authorize(req)) {
+      const account = await opts.authorize(req)
+      if (!account) {
         // Le client découvre le serveur d'autorisation par cet en-tête (RFC 9728).
         return reply
           .code(401)
@@ -447,8 +459,13 @@ export function registerMcp(
           )
           .send({ error: 'unauthorized' })
       }
+      try {
+        assertFeature(account, 'mcp')
+      } catch (err) {
+        return reply.code(403).send({ error: (err as Error).message })
+      }
       // Sans état : un serveur et un transport par requête.
-      const server = buildMcpServer(opts.db, opts.origin(req), opts.storage)
+      const server = buildMcpServer(opts.db, account, opts.origin(req), opts.storage)
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: undefined,
         enableJsonResponse: true,

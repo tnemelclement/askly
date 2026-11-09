@@ -11,7 +11,13 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as CgvRouteImport } from './routes/cgv'
+import { Route as ConfidentialiteRouteImport } from './routes/confidentialite'
+import { Route as MentionsLegalesRouteImport } from './routes/mentions-legales'
+import { Route as SignupRouteImport } from './routes/signup'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminAccountRouteImport } from './routes/admin.account'
+import { Route as AdminEditRouteImport } from './routes/admin.edit'
 import { Route as AdminLoginRouteImport } from './routes/admin_.login'
 import { Route as RTokenRouteImport } from './routes/r.$token'
 import { Route as AdminFormsFormIdRouteImport } from './routes/admin.forms.$formId'
@@ -27,9 +33,39 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CgvRoute = CgvRouteImport.update({
+  id: '/cgv',
+  path: '/cgv',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConfidentialiteRoute = ConfidentialiteRouteImport.update({
+  id: '/confidentialite',
+  path: '/confidentialite',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MentionsLegalesRoute = MentionsLegalesRouteImport.update({
+  id: '/mentions-legales',
+  path: '/mentions-legales',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAccountRoute = AdminAccountRouteImport.update({
+  id: '/account',
+  path: '/account',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminEditRoute = AdminEditRouteImport.update({
+  id: '/edit',
+  path: '/edit',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminLoginRoute = AdminLoginRouteImport.update({
@@ -57,6 +93,12 @@ const AdminRespondentsRespondentIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/cgv': typeof CgvRoute
+  '/confidentialite': typeof ConfidentialiteRoute
+  '/mentions-legales': typeof MentionsLegalesRoute
+  '/signup': typeof SignupRoute
+  '/admin/account': typeof AdminAccountRoute
+  '/admin/edit': typeof AdminEditRoute
   '/admin/login': typeof AdminLoginRoute
   '/r/$token': typeof RTokenRoute
   '/admin/': typeof AdminIndexRoute
@@ -65,6 +107,12 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/cgv': typeof CgvRoute
+  '/confidentialite': typeof ConfidentialiteRoute
+  '/mentions-legales': typeof MentionsLegalesRoute
+  '/signup': typeof SignupRoute
+  '/admin/account': typeof AdminAccountRoute
+  '/admin/edit': typeof AdminEditRoute
   '/admin/login': typeof AdminLoginRoute
   '/r/$token': typeof RTokenRoute
   '/admin': typeof AdminIndexRoute
@@ -75,6 +123,12 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/cgv': typeof CgvRoute
+  '/confidentialite': typeof ConfidentialiteRoute
+  '/mentions-legales': typeof MentionsLegalesRoute
+  '/signup': typeof SignupRoute
+  '/admin/account': typeof AdminAccountRoute
+  '/admin/edit': typeof AdminEditRoute
   '/admin_/login': typeof AdminLoginRoute
   '/r/$token': typeof RTokenRoute
   '/admin/': typeof AdminIndexRoute
@@ -86,6 +140,12 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/cgv'
+    | '/confidentialite'
+    | '/mentions-legales'
+    | '/signup'
+    | '/admin/account'
+    | '/admin/edit'
     | '/admin/login'
     | '/r/$token'
     | '/admin/'
@@ -94,6 +154,12 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/cgv'
+    | '/confidentialite'
+    | '/mentions-legales'
+    | '/signup'
+    | '/admin/account'
+    | '/admin/edit'
     | '/admin/login'
     | '/r/$token'
     | '/admin'
@@ -103,6 +169,12 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/cgv'
+    | '/confidentialite'
+    | '/mentions-legales'
+    | '/signup'
+    | '/admin/account'
+    | '/admin/edit'
     | '/admin_/login'
     | '/r/$token'
     | '/admin/'
@@ -113,6 +185,10 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
+  CgvRoute: typeof CgvRoute
+  ConfidentialiteRoute: typeof ConfidentialiteRoute
+  MentionsLegalesRoute: typeof MentionsLegalesRoute
+  SignupRoute: typeof SignupRoute
   AdminLoginRoute: typeof AdminLoginRoute
   RTokenRoute: typeof RTokenRoute
 }
@@ -133,11 +209,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cgv': {
+      id: '/cgv'
+      path: '/cgv'
+      fullPath: '/cgv'
+      preLoaderRoute: typeof CgvRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/confidentialite': {
+      id: '/confidentialite'
+      path: '/confidentialite'
+      fullPath: '/confidentialite'
+      preLoaderRoute: typeof ConfidentialiteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mentions-legales': {
+      id: '/mentions-legales'
+      path: '/mentions-legales'
+      fullPath: '/mentions-legales'
+      preLoaderRoute: typeof MentionsLegalesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/': {
       id: '/admin/'
       path: '/'
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/account': {
+      id: '/admin/account'
+      path: '/account'
+      fullPath: '/admin/account'
+      preLoaderRoute: typeof AdminAccountRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/edit': {
+      id: '/admin/edit'
+      path: '/edit'
+      fullPath: '/admin/edit'
+      preLoaderRoute: typeof AdminEditRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin_/login': {
@@ -172,12 +290,16 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteChildren {
+  AdminAccountRoute: typeof AdminAccountRoute
+  AdminEditRoute: typeof AdminEditRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminFormsFormIdRoute: typeof AdminFormsFormIdRoute
   AdminRespondentsRespondentIdRoute: typeof AdminRespondentsRespondentIdRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminAccountRoute: AdminAccountRoute,
+  AdminEditRoute: AdminEditRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminFormsFormIdRoute: AdminFormsFormIdRoute,
   AdminRespondentsRespondentIdRoute: AdminRespondentsRespondentIdRoute,
@@ -188,6 +310,10 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
+  CgvRoute: CgvRoute,
+  ConfidentialiteRoute: ConfidentialiteRoute,
+  MentionsLegalesRoute: MentionsLegalesRoute,
+  SignupRoute: SignupRoute,
   AdminLoginRoute: AdminLoginRoute,
   RTokenRoute: RTokenRoute,
 }

@@ -1,12 +1,30 @@
-import { createHmac, timingSafeEqual } from 'node:crypto'
+import { timingSafeEqual } from 'node:crypto'
 import { PassThrough } from 'node:stream'
 import Anthropic from '@anthropic-ai/sdk'
 import type { Db } from '@askly/db'
+import { accounts as accountsTable, files as filesTable } from '@askly/db'
 import cookie from '@fastify/cookie'
 import multipart from '@fastify/multipart'
 import fastifyStatic from '@fastify/static'
+import { eq } from 'drizzle-orm'
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify'
+import { stringify } from 'yaml'
 import { z } from 'zod'
+import {
+  type Account,
+  accountSummary,
+  assertActive,
+  authenticate,
+  canStartResponse,
+  createAccount,
+  findAccountByApiToken,
+  getAccount,
+  OWNER_ID,
+  rotateApiToken,
+  sessionVersion,
+  setPassword,
+  verifyPassword,
+} from './accounts.ts'
 import {
   createRespondent,
   deleteForm,
@@ -20,6 +38,13 @@ import {
 } from './admin.ts'
 import { pendingQuestion, runTurn, visibleMessages } from './ai.ts'
 import {
+  type BillingConfig,
+  createCheckout,
+  createPortal,
+  handleEvent,
+  verifyWebhook,
+} from './billing.ts'
+import {
   allQuestions,
   type ChatEvent,
   type Form,
@@ -29,6 +54,7 @@ import {
   STATUS_LABELS,
   validateAnswer,
 } from './domain.ts'
+import { createDraftLimiter, draftForm } from './draft.ts'
 import {
   addImage,
   addRespondentFile,
@@ -54,9 +80,14 @@ import {
 export interface AppOptions {
   db: Db
   anthropic: Anthropic
-  adminPassword: string
-  /** Jeton pour piloter l'admin par l'API (skill de Claude) ; absent = API admin par cookie seulement. */
+  /** Clé de signature des sessions et jetons OAuth : la changer déconnecte tout le monde. */
+  secret: string
+  /** Jeton d'API historique du propriétaire (ADMIN_API_TOKEN), en plus des jetons par compte. */
   apiToken?: string
+  /** Inscription ouverte (SaaS) ; sinon seul le propriétaire se connecte. */
+  signup?: boolean
+  /** Abonnements Stripe ; absent, les comptes restent sur leur plan (essai, illimité…). */
+  billing?: BillingConfig
   /** Adresse publique de l'app (ex. https://ask.tnemelc.fr), pour les liens renvoyés. */
   publicUrl?: string
   logger?: boolean | object
@@ -67,6 +98,7 @@ export interface AppOptions {
 }
 
 const ADMIN_COOKIE = 'admin_session'
+const SESSION_TTL = 60 * 60 * 24 * 30
 const MAX_MESSAGE_LENGTH = 2000
 /** Garde-fou de coût : au-delà, la conversation est manifestement détournée. */
 const MAX_USER_MESSAGES = 150
@@ -79,8 +111,10 @@ const optionalEmail = z
 export function buildApp({
   db,
   anthropic,
-  adminPassword,
+  secret,
   apiToken,
+  signup = false,
+  billing,
   publicUrl,
   logger = false,
   webDist,
@@ -104,9 +138,7 @@ export function buildApp({
     )
   }
 
-  // Jeton de session admin = HMAC du mot de passe : changer ADMIN_PASSWORD déconnecte tout le monde.
-  const sessionToken = createHmac('sha256', adminPassword).update('admin-session').digest('hex')
-  const signer = createSigner(adminPassword)
+  const signer = createSigner(secret)
   // Partagé par la connexion admin et la page d'autorisation OAuth.
   const limiter = createLoginLimiter()
   const safeEqual = (a: string, b: string) => {
@@ -123,11 +155,40 @@ export function buildApp({
     return reply.code(500).send({ error: 'Erreur interne' })
   })
 
-  function requireAdmin(req: FastifyRequest) {
+  /** Compte d'un jeton d'API : celui du propriétaire (ADMIN_API_TOKEN) ou un jeton de compte. */
+  async function accountOfApiToken(token: string) {
+    if (apiToken && safeEqual(token, apiToken)) return (await getAccount(db, OWNER_ID)) ?? null
+    return (await findAccountByApiToken(db, token)) ?? null
+  }
+
+  /** Compte connecté (cookie de session ou jeton d'API), sinon 401. */
+  async function requireAccount(req: FastifyRequest): Promise<Account> {
     const bearer = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1]
-    if (apiToken && bearer && safeEqual(bearer, apiToken)) return
-    const value = req.cookies[ADMIN_COOKIE]
-    if (!value || !safeEqual(value, sessionToken)) throw new HttpError(401, 'Non connecté')
+    if (bearer) {
+      const account = await accountOfApiToken(bearer)
+      if (account) return account
+    }
+    const session = signer.verify(req.cookies[ADMIN_COOKIE] ?? '', 'session')
+    const account = typeof session?.acc === 'string' && (await getAccount(db, session.acc))
+    // Un changement de mot de passe invalide les sessions ouvertes avant.
+    if (!account || session?.v !== sessionVersion(account)) {
+      throw new HttpError(401, 'Non connecté')
+    }
+    return account
+  }
+
+  function openSession(reply: FastifyReply, account: Account) {
+    const value = signer.sign(
+      { typ: 'session', acc: account.id, v: sessionVersion(account) },
+      SESSION_TTL,
+    )
+    reply.setCookie(ADMIN_COOKIE, value, {
+      path: '/api/admin',
+      httpOnly: true,
+      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: SESSION_TTL,
+    })
   }
 
   /** Liens publics : `PUBLIC_URL`, sinon le domaine par lequel on a été appelé (trustProxy). */
@@ -136,7 +197,7 @@ export function buildApp({
   async function respondentOrThrow(token: string): Promise<{ respondent: Respondent; form: Form }> {
     const respondent = await findRespondentByToken(db, token)
     if (!respondent) throw new HttpError(404, 'Lien invalide')
-    return { respondent, form: await formOrThrow(db, respondent.formId) }
+    return { respondent, form: await formOrThrow(db, respondent.accountId, respondent.formId) }
   }
 
   async function conversation(form: Form, respondentId: string) {
@@ -180,6 +241,16 @@ export function buildApp({
       history.filter((m) => m.display !== null && m.role === 'user').length >= MAX_USER_MESSAGES
     ) {
       throw new HttpError(429, 'Trop de messages pour ce questionnaire')
+    }
+    // Quota du compte : compté quand une personne commence ; celles déjà lancées continuent.
+    if (!respondent.startedAt) {
+      const account = await getAccount(db, respondent.accountId)
+      if (!account || !(await canStartResponse(db, account))) {
+        throw new HttpError(
+          402,
+          'Ce questionnaire n’accepte plus de nouvelles réponses pour le moment. Prévenez la personne qui vous l’a envoyé.',
+        )
+      }
     }
     if (busy.has(respondent.id)) throw new HttpError(409, 'Une réponse est déjà en cours')
     busy.add(respondent.id)
@@ -249,7 +320,7 @@ export function buildApp({
     const { respondent, form } = await respondentOrThrow(token)
     if (respondent.submittedAt) throw new HttpError(409, 'Réponses déjà envoyées')
     const file = await readUpload(req)
-    const added = await addRespondentFile(db, storage, form, respondent.id, questionId, file)
+    const added = await addRespondentFile(db, storage, form, respondent, questionId, file)
     return {
       file: added,
       answers: await loadAnswers(db, respondent.id),
@@ -309,20 +380,40 @@ export function buildApp({
 
   // ─── Admin ─────────────────────────────────────────────────────────────────
 
-  app.post('/api/admin/login', async (req, reply) => {
-    const { password } = z.object({ password: z.string().max(200) }).parse(req.body)
-    if (limiter.blocked()) throw new HttpError(429, 'Trop de tentatives, réessayez plus tard')
-    if (!safeEqual(password, adminPassword)) {
-      limiter.fail()
-      throw new HttpError(401, 'Mot de passe incorrect')
+  app.get('/api/config', async () => ({ signup, billing: Boolean(billing) }))
+
+  const credentials = z.object({
+    email: z.email().max(320),
+    password: z.string().min(8, 'Mot de passe : 8 caractères minimum').max(200),
+  })
+
+  app.post('/api/admin/signup', async (req, reply) => {
+    if (!signup) throw new HttpError(403, 'Inscription fermée sur cette instance')
+    const body = credentials.extend({ acceptTerms: z.literal(true) }).parse(req.body)
+    if (limiter.blocked(req.ip)) throw new HttpError(429, 'Trop de tentatives, réessayez plus tard')
+    // Compté comme un échec : freine la création de comptes en série depuis une même IP.
+    limiter.fail(`signup:${req.ip}`)
+    if (limiter.blocked(`signup:${req.ip}`)) {
+      throw new HttpError(429, 'Trop de comptes créés, réessayez plus tard')
     }
-    reply.setCookie(ADMIN_COOKIE, sessionToken, {
-      path: '/api/admin',
-      httpOnly: true,
-      sameSite: 'strict',
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24 * 30,
-    })
+    openSession(reply, await createAccount(db, body.email, body.password))
+    return { ok: true }
+  })
+
+  app.post('/api/admin/login', async (req, reply) => {
+    const { email, password } = z
+      .object({ email: z.string().max(320), password: z.string().max(200) })
+      .parse(req.body)
+    const key = email.trim().toLowerCase()
+    if (limiter.blocked(key, req.ip)) {
+      throw new HttpError(429, 'Trop de tentatives, réessayez plus tard')
+    }
+    const account = await authenticate(db, email, password)
+    if (!account) {
+      limiter.fail(key, req.ip)
+      throw new HttpError(401, 'E-mail ou mot de passe incorrect')
+    }
+    openSession(reply, account)
     return { ok: true }
   })
 
@@ -331,70 +422,178 @@ export function buildApp({
     return { ok: true }
   })
 
-  app.get('/api/admin/me', async (req) => {
-    requireAdmin(req)
+  app.get('/api/admin/me', async (req) => ({
+    ...(await accountSummary(db, await requireAccount(req))),
+    billing: Boolean(billing),
+    mcpUrl: `${origin(req)}/mcp`,
+  }))
+
+  // Nouveau jeton d'API (affiché une seule fois) ; l'ancien cesse de marcher.
+  app.post('/api/admin/api-token', async (req) => {
+    const account = await requireAccount(req)
+    return { token: await rotateApiToken(db, account.id) }
+  })
+
+  app.post('/api/admin/password', async (req, reply) => {
+    const account = await requireAccount(req)
+    const body = z
+      .object({ current: z.string().max(200), password: credentials.shape.password })
+      .parse(req.body)
+    if (!(await verifyPassword(body.current, account.passwordHash))) {
+      throw new HttpError(400, 'Mot de passe actuel incorrect')
+    }
+    await setPassword(db, account.id, body.password)
+    openSession(reply, (await getAccount(db, account.id)) as Account)
     return { ok: true }
   })
 
+  // Supprime le compte et tout ce qu'il contient (questionnaires, réponses, fichiers).
+  app.delete('/api/admin/account', async (req, reply) => {
+    const account = await requireAccount(req)
+    if (account.id === OWNER_ID)
+      throw new HttpError(400, 'Le compte propriétaire ne se supprime pas')
+    if (account.subscriptionStatus && account.subscriptionStatus !== 'canceled') {
+      throw new HttpError(400, 'Résiliez d’abord votre abonnement (Mon compte, Gérer l’abonnement)')
+    }
+    const { password } = z.object({ password: z.string().max(200) }).parse(req.body)
+    if (!(await verifyPassword(password, account.passwordHash))) {
+      throw new HttpError(400, 'Mot de passe incorrect')
+    }
+    const keys = (
+      await db
+        .select({ key: filesTable.key })
+        .from(filesTable)
+        .where(eq(filesTable.accountId, account.id))
+    ).map((f) => f.key)
+    await db.delete(accountsTable).where(eq(accountsTable.id, account.id))
+    if (keys.length) await storage?.remove(keys)
+    reply.clearCookie(ADMIN_COOKIE, { path: '/api/admin' })
+    return { ok: true }
+  })
+
+  app.post('/api/admin/billing/checkout', async (req) => {
+    const account = await requireAccount(req)
+    if (!billing) throw new HttpError(503, 'Paiement non configuré sur cette instance')
+    const { plan } = z.object({ plan: z.enum(['solo', 'pro']) }).parse(req.body)
+    // Déjà abonné : on change d'offre par le portail (prorata géré par Stripe).
+    if (
+      account.stripeCustomerId &&
+      account.subscriptionStatus &&
+      account.subscriptionStatus !== 'canceled'
+    ) {
+      return { url: await createPortal(billing, account, origin(req)) }
+    }
+    return { url: await createCheckout(billing, account, plan, origin(req)) }
+  })
+
+  app.post('/api/admin/billing/portal', async (req) => {
+    const account = await requireAccount(req)
+    if (!billing) throw new HttpError(503, 'Paiement non configuré sur cette instance')
+    return { url: await createPortal(billing, account, origin(req)) }
+  })
+
+  // Webhook Stripe : corps brut nécessaire pour vérifier la signature.
+  app.register(async (scope) => {
+    scope.addContentTypeParser('application/json', { parseAs: 'buffer' }, (_req, body, done) =>
+      done(null, body),
+    )
+    scope.post('/api/stripe/webhook', async (req, reply) => {
+      if (!billing) return reply.code(404).send({ error: 'Introuvable' })
+      const raw = req.body as Buffer
+      if (
+        !verifyWebhook(
+          raw,
+          req.headers['stripe-signature'] as string | undefined,
+          billing.webhookSecret,
+        )
+      ) {
+        return reply.code(400).send({ error: 'Signature invalide' })
+      }
+      await handleEvent(db, billing, JSON.parse(raw.toString('utf8')))
+      return { received: true }
+    })
+  })
+
   const formParams = z.object({ formId: z.string() })
+  const draftLimit = createDraftLimiter()
+
+  // L'IA rédige un questionnaire (YAML à relire) à partir d'une description.
+  app.post('/api/admin/forms/draft', async (req) => {
+    const account = await requireAccount(req)
+    assertActive(account)
+    const { brief } = z.object({ brief: z.string().trim().min(10).max(4000) }).parse(req.body)
+    draftLimit(account.id)
+    return { source: await draftForm(anthropic, brief) }
+  })
 
   app.get('/api/admin/forms', async (req) => {
-    requireAdmin(req)
-    return listFormSummaries(db)
+    const account = await requireAccount(req)
+    return listFormSummaries(db, account.id)
   })
 
   app.get('/api/admin/forms/:formId', async (req) => {
-    requireAdmin(req)
-    const form = await formOrThrow(db, formParams.parse(req.params).formId)
-    return { form, respondents: await listRespondents(db, form, origin(req)) }
+    const account = await requireAccount(req)
+    const form = await formOrThrow(db, account.id, formParams.parse(req.params).formId)
+    const { id: _id, reusable: _reusable, ...definition } = form
+    return {
+      form,
+      // Texte YAML de la définition, pour l'éditeur.
+      source: stringify(definition, { lineWidth: 100 }),
+      respondents: await listRespondents(db, account.id, form, origin(req)),
+    }
   })
 
   app.put('/api/admin/forms/:formId', async (req) => {
-    requireAdmin(req)
+    const account = await requireAccount(req)
     const { formId } = formParams.parse(req.params)
     const body = z
-      .object({ definition: z.unknown(), reusable: z.boolean().optional() })
+      .object({
+        definition: z.unknown(),
+        reusable: z.boolean().optional(),
+        // `create` : refuse un id déjà pris (l'éditeur, pour ne pas écraser un questionnaire).
+        mode: z.enum(['create', 'upsert']).default('upsert'),
+      })
       .parse(req.body)
-    const saved = await putForm(db, formId, body.definition, body.reusable, 'upsert')
+    const saved = await putForm(db, account, formId, body.definition, body.reusable, body.mode)
     return { ...saved, adminUrl: `${origin(req)}/admin/forms/${saved.id}` }
   })
 
   app.delete('/api/admin/forms/:formId', async (req) => {
-    requireAdmin(req)
-    return deleteForm(db, storage, formParams.parse(req.params).formId)
+    const account = await requireAccount(req)
+    return deleteForm(db, storage, account.id, formParams.parse(req.params).formId)
   })
 
   app.post('/api/admin/forms/:formId/respondents', async (req) => {
-    requireAdmin(req)
+    const account = await requireAccount(req)
     const body = z
       .object({ name: z.string().trim().min(1).max(200), email: optionalEmail })
       .parse(req.body)
-    return createRespondent(db, formParams.parse(req.params).formId, body, origin(req))
+    return createRespondent(db, account, formParams.parse(req.params).formId, body, origin(req))
   })
 
   app.get('/api/admin/respondents/:id', async (req) => {
-    requireAdmin(req)
+    const account = await requireAccount(req)
     const { id } = z.object({ id: z.uuid() }).parse(req.params)
-    return getRespondentDetail(db, id, origin(req))
+    return getRespondentDetail(db, account.id, id, origin(req))
   })
 
   app.get('/api/admin/files/:id', async (req, reply) => {
-    requireAdmin(req)
+    const account = await requireAccount(req)
     const { id } = z.object({ id: z.uuid() }).parse(req.params)
-    return redirectToFile(reply, await findFile(db, id))
+    return redirectToFile(reply, await findFile(db, id, account.id))
   })
 
   // Image pour un questionnaire (multipart) ; renvoie l'adresse à mettre dans `image.url`.
   app.post('/api/admin/images', async (req) => {
-    requireAdmin(req)
-    return addImage(db, storage, await readUpload(req), origin(req))
+    const account = await requireAccount(req)
+    return addImage(db, storage, account.id, await readUpload(req), origin(req))
   })
 
   app.get('/api/admin/forms/:formId/export', async (req, reply) => {
-    requireAdmin(req)
-    const form = await formOrThrow(db, formParams.parse(req.params).formId)
+    const account = await requireAccount(req)
+    const form = await formOrThrow(db, account.id, formParams.parse(req.params).formId)
     const { format } = z.object({ format: z.enum(['json', 'csv']) }).parse(req.query)
-    const rows = await exportAnswers(db, form)
+    const rows = await exportAnswers(db, account.id, form)
     sendDownload(reply, `${form.id}.${format}`)
     if (format === 'json') {
       return rows.map(({ respondent: r, status, answers, files }) => ({
@@ -437,15 +636,22 @@ export function buildApp({
 
   // ─── MCP et OAuth (connecteur claude.ai) ──────────────────────────────────
 
-  registerOAuth(app, { adminPassword, origin, signer, safeEqual, limiter })
+  registerOAuth(app, {
+    origin,
+    signer,
+    limiter,
+    authenticate: async (email, password) => (await authenticate(db, email, password))?.id ?? null,
+  })
   registerMcp(app, {
     db,
     storage,
     origin,
-    authorize: (req) => {
+    authorize: async (req) => {
       const bearer = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1]
-      if (!bearer) return false
-      return Boolean(apiToken && safeEqual(bearer, apiToken)) || verifyAccessToken(signer, bearer)
+      if (!bearer) return null
+      const oauthAccount = verifyAccessToken(signer, bearer, OWNER_ID)
+      if (oauthAccount) return (await getAccount(db, oauthAccount)) ?? null
+      return accountOfApiToken(bearer)
     },
   })
 

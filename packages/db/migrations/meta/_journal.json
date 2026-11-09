@@ -22,6 +22,13 @@
       "when": 1794166663212,
       "tag": "0002_sour_veda",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794251912083,
+      "tag": "0003_accounts",
+      "breakpoints": true
     }
   ]
 }
