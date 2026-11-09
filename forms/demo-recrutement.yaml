@@ -1,0 +1,36 @@
+# Démo publique de la page d'accueil (bouton « Essayer »). Rien n'est utilisé pour de vrai.
+title: Candidature, serveur ou serveuse en salle
+intro: >
+  Démo Askly : vous jouez un candidat qui postule dans un restaurant. Quelques questions
+  avant l'entretien ; répondez comme vous le feriez à l'oral. Rien n'est envoyé à personne.
+context: >
+  Démonstration publique. Le répondant joue un candidat à un poste de serveur ou serveuse
+  dans un restaurant. Ton chaleureux, jamais intimidant. Si l'expérience est courte, valoriser
+  ce qui s'en approche (job d'été, associatif, accueil du public). Les réponses serviraient à
+  préparer l'entretien.
+sections:
+  - title: Vous
+    questions:
+      - id: experience
+        label: Avez-vous déjà travaillé en salle ou au contact de clients ?
+        type: longtext
+        suggestions:
+          - Oui, plusieurs saisons
+          - Un peu, en job d'été
+          - Non, ce serait une première
+      - id: disponibilites
+        label: Quand êtes-vous disponible ?
+        type: multichoice
+        options: [Midis en semaine, Soirs en semaine, Week-ends, Jours fériés]
+      - id: contrat
+        label: Quel contrat cherchez-vous ?
+        type: choice
+        options: [CDI temps plein, CDI temps partiel, Extra ou saison]
+      - id: debut
+        label: À partir de quand pourriez-vous commencer ?
+        type: date
+        help: Une date approximative suffit.
+      - id: transport
+        label: Pouvez-vous rentrer chez vous après un service du soir (vers minuit) ?
+        type: yesno
+        help: Il n'y a pas de bonne ou mauvaise réponse ; c'est pour organiser les plannings.

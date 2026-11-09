@@ -10,13 +10,9 @@ import {
   PencilLine,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
-import {
-  ConversationThread,
-  GuideMessage,
-  UserAnswer,
-} from '@/components/conversation/conversation'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { Comparison, Demo, HERO_SCRIPT, ScriptedChat } from './landing-demo'
 
 const REPO = 'https://github.com/tnemelclement/askly'
 
@@ -131,20 +127,25 @@ export function Landing() {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button asChild size="lg" className="h-11 px-5">
-                <a href="/signup">
-                  Essayer gratuitement <ArrowRight data-icon="inline-end" />
+                <a href="#demo">
+                  Voir la démo <ArrowRight data-icon="inline-end" />
                 </a>
               </Button>
               <Button asChild size="lg" variant="outline" className="h-11 px-5">
-                <a href="#tarifs">Voir les tarifs</a>
+                <a href="/signup">Essai gratuit</a>
               </Button>
             </div>
             <p className="mt-4 text-sm text-muted-foreground">
-              14 jours d'essai, sans carte bancaire.
+              14 jours d'essai, sans carte bancaire. Ou téléchargez-le : c'est un logiciel libre.
             </p>
           </div>
-          <Preview />
+          <div className="rounded-xl border bg-background p-5 shadow-lg sm:p-6">
+            <ScriptedChat script={HERO_SCRIPT} loop />
+          </div>
         </section>
+
+        <Comparison />
+        <Demo />
 
         <section className="border-y bg-muted/50">
           <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
@@ -319,28 +320,6 @@ export function SiteFooter() {
         </nav>
       </div>
     </footer>
-  )
-}
-
-function Preview() {
-  return (
-    <div className="rounded-xl border bg-background p-5 shadow-lg sm:p-6" aria-hidden>
-      <ConversationThread>
-        <GuideMessage>Quel est l'objectif principal de votre site ?</GuideMessage>
-        <UserAnswer>Je ne sais pas trop, c'est quoi la différence ?</UserAnswer>
-        <GuideMessage>
-          Un site vitrine présente votre activité ; un site de vente encaisse des commandes. Vous
-          voulez surtout être trouvé, ou vendre en ligne ?
-        </GuideMessage>
-        <li className="ml-11 flex flex-wrap gap-2">
-          {['Présenter mon activité', 'Obtenir des devis', 'Vendre en ligne'].map((o) => (
-            <span key={o} className="rounded-full border px-3 py-1.5 text-sm">
-              {o}
-            </span>
-          ))}
-        </li>
-      </ConversationThread>
-    </div>
   )
 }
 

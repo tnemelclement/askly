@@ -1,0 +1,41 @@
+# Démo publique de la page d'accueil (bouton « Essayer »). Rien n'est utilisé pour de vrai.
+title: Votre futur site internet
+intro: >
+  Démo Askly : vous jouez un commerçant qui fait faire son site par une agence. Répondez
+  librement, demandez ce que veut dire un mot technique : l'assistant explique. Rien n'est
+  envoyé à personne.
+context: >
+  Démonstration publique. Le répondant joue un commerçant ou un artisan qui commande un site
+  à une agence web. Il n'est pas technicien : évitez le jargon (SEO, CMS, nom de domaine) ou
+  expliquez-le avec un exemple concret. Les réponses serviraient à préparer un devis.
+sections:
+  - title: Votre activité
+    questions:
+      - id: activite
+        label: Que faites-vous, et pour quels clients ?
+        type: longtext
+        suggestions: [Boulangerie de quartier, Plombier chauffagiste, Coach sportif]
+      - id: objectif
+        label: Qu'attendez-vous d'abord de votre site ?
+        type: choice
+        options: [Être trouvé sur Google, Recevoir des demandes de devis, Vendre en ligne, Prendre des rendez-vous]
+        help: S'il en cite plusieurs, lui demander lequel compte le plus.
+  - title: Le site
+    questions:
+      - id: pages
+        label: Quelles pages imaginez-vous ?
+        type: multichoice
+        options: [Accueil, Services ou produits, Réalisations, Tarifs, À propos, Contact, Blog]
+      - id: nom_domaine
+        label: Avez-vous déjà un nom de domaine ?
+        type: yesno
+        help: Le nom de domaine, c'est l'adresse du site, comme « boulangerie-martin.fr ».
+      - id: exemple
+        label: Un site que vous aimez bien, même d'un autre domaine ?
+        type: text
+        required: false
+        suggestions: [Pas d'exemple en tête]
+      - id: mise_en_ligne
+        label: Pour quand aimeriez-vous qu'il soit en ligne ?
+        type: date
+        required: false

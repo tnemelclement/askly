@@ -382,6 +382,29 @@ export function buildApp({
 
   app.get('/api/config', async () => ({ signup, billing: Boolean(billing) }))
 
+  // Démo de la page d'accueil : un lien de répondant neuf sur un questionnaire `demo-*` du
+  // propriétaire (importé de forms/). 5 par heure et par IP : chaque démo coûte des appels à l'IA.
+  const demoLimiter = createLoginLimiter(5, 60 * 60 * 1000)
+  app.post('/api/demo/:formId', async (req) => {
+    const { formId } = z
+      .object({ formId: z.string().regex(/^demo-[a-z0-9-]{1,40}$/) })
+      .parse(req.params)
+    if (demoLimiter.blocked(req.ip)) {
+      throw new HttpError(429, 'Vous avez lancé beaucoup de démos : réessayez dans une heure.')
+    }
+    const owner = await getAccount(db, OWNER_ID)
+    if (!owner) throw new HttpError(404, 'Démo indisponible')
+    const created = await createRespondent(
+      db,
+      owner,
+      formId,
+      { name: 'Visiteur (démo)' },
+      origin(req),
+    )
+    demoLimiter.fail(req.ip)
+    return { link: created.link }
+  })
+
   const credentials = z.object({
     email: z.email().max(320),
     password: z.string().min(8, 'Mot de passe : 8 caractères minimum').max(200),

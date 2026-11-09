@@ -1,0 +1,47 @@
+# Démo publique de la page d'accueil (bouton « Essayer »). Rien n'est utilisé pour de vrai.
+title: Votre projet de rénovation
+intro: >
+  Démo Askly : vous jouez un particulier qui demande un devis à un artisan. Répondez comme
+  vous voulez, posez des questions, hésitez : l'assistant s'adapte. Rien n'est envoyé à
+  personne.
+context: >
+  Démonstration publique. Le répondant joue un particulier qui veut rénover une pièce et
+  demande un devis à une entreprise de rénovation. Il n'est pas du métier : expliquez les
+  termes simplement (cloison, chape, faïence…). Les réponses serviraient à préparer une
+  visite et un devis.
+sections:
+  - title: Le chantier
+    questions:
+      - id: piece
+        label: Quelle pièce voulez-vous rénover ?
+        type: choice
+        options: [Cuisine, Salle de bain, Chambre ou séjour, Plusieurs pièces]
+      - id: travaux
+        label: Quels travaux envisagez-vous ?
+        type: multichoice
+        options: [Peinture, Sol, Plomberie, Électricité, Abattre ou monter une cloison, Je ne sais pas encore]
+        help: S'il ne sait pas, lui demander ce qui ne lui plaît pas dans la pièce aujourd'hui.
+      - id: surface
+        label: Quelle est la surface approximative de la pièce, en m² ?
+        type: number
+        help: Une estimation suffit. Longueur × largeur, ou « à peu près la taille d'une chambre » (10 à 12 m²).
+      - id: photos
+        label: Pouvez-vous joindre une ou deux photos de la pièce actuelle ?
+        type: file
+        required: false
+        help: Pour la démo, n'importe quelle photo convient.
+  - title: Budget et délais
+    questions:
+      - id: budget
+        label: Quel budget envisagez-vous ?
+        type: choice
+        options: [Moins de 5 000 €, 5 000 à 15 000 €, 15 000 à 30 000 €, Plus de 30 000 €, Je ne sais pas]
+        help: S'il n'a aucune idée, rappeler qu'une salle de bain complète coûte souvent 8 000 à 15 000 €.
+      - id: debut
+        label: Pour quand souhaitez-vous que les travaux commencent ?
+        type: date
+        required: false
+        help: Une date approximative suffit (le 1er du mois visé).
+      - id: occupe
+        label: Habiterez-vous le logement pendant les travaux ?
+        type: yesno

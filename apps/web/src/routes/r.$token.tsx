@@ -230,6 +230,23 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
         <div className="mx-auto flex h-full max-w-6xl flex-col items-center justify-center gap-4 overflow-hidden bg-background p-6 text-center sm:rounded-xl sm:border sm:shadow-lg">
           <CircleCheck className="size-16 text-primary" aria-hidden />
           <p className="text-lg font-medium">Vos réponses ont été envoyées. Merci !</p>
+          {/* Démo de la page d'accueil : on propose la suite. */}
+          {form.id.startsWith('demo-') && (
+            <>
+              <p className="max-w-md text-muted-foreground">
+                C'est ce que vivront vos clients. Créez vos propres questionnaires en décrivant ce
+                que vous voulez savoir.
+              </p>
+              <div className="flex flex-wrap justify-center gap-3">
+                <Button asChild size="lg">
+                  <a href="/signup">Essai gratuit de 14 jours</a>
+                </Button>
+                <Button asChild size="lg" variant="outline">
+                  <a href="/#demo">Retour à la démo</a>
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     )
