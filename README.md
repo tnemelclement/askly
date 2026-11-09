@@ -131,3 +131,7 @@ question ouverte les `suggestions` du questionnaire complétées par celles de l
 Chaque réponse, qu'elle vienne de l'IA (outil `record_answer`) ou d'une correction à la
 main, est revalidée côté serveur contre le type de sa question. Une valeur invalide est
 refusée, tout comme un id de question inconnu.
+
+## Licence
+
+MIT, voir [LICENSE](LICENSE).
