@@ -45,19 +45,6 @@ const PLANS = [
     cta: { label: 'Essayer gratuitement', href: '/signup' },
     featured: true,
   },
-  {
-    name: 'Auto-hébergé',
-    price: '0 €',
-    period: '',
-    pitch: 'Sur votre serveur, avec votre clé Anthropic.',
-    features: [
-      'Toutes les fonctions',
-      'Réponses illimitées',
-      'Licence MIT',
-      'Vous gérez mises à jour et sauvegardes',
-    ],
-    cta: { label: 'Voir le dépôt', href: REPO },
-  },
 ]
 
 const FAQ = [
@@ -214,7 +201,7 @@ export function Landing() {
             <p className="mt-3 text-muted-foreground">
               Sans engagement. 14 jours d'essai gratuit, toutes fonctions, 20 réponses.
             </p>
-            <div className="mt-10 grid gap-6 lg:grid-cols-3">
+            <div className="mt-10 grid max-w-4xl gap-6 md:grid-cols-2">
               {PLANS.map((plan) => (
                 <div
                   key={plan.name}
