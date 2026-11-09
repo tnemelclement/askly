@@ -17,6 +17,7 @@ export function ChatLayout({
   panel,
   panelSummary,
   scrollRef,
+  embedded = false,
 }: {
   title: string
   children: ReactNode
@@ -25,6 +26,8 @@ export function ChatLayout({
   panel: ReactNode
   panelSummary: string
   scrollRef?: React.Ref<HTMLElement>
+  /** Dans une page (démo de l'accueil) : remplit son conteneur au lieu de l'écran. */
+  embedded?: boolean
 }) {
   const [panelOpen, setPanelOpen] = useState(false)
   const panelId = useId()
@@ -39,8 +42,13 @@ export function ChatLayout({
 
   return (
     // Fenêtre posée sur un fond (dès la tablette) : un questionnaire, pas une application.
-    <div className="h-dvh bg-muted sm:p-6">
-      <div className="mx-auto flex h-full max-w-6xl flex-col overflow-hidden bg-background sm:rounded-xl sm:border sm:shadow-lg">
+    <div className={embedded ? 'h-full' : 'h-dvh bg-muted sm:p-6'}>
+      <div
+        className={cn(
+          'mx-auto flex h-full max-w-6xl flex-col overflow-hidden bg-background',
+          embedded ? 'rounded-xl border shadow-2xl' : 'sm:rounded-xl sm:border sm:shadow-lg',
+        )}
+      >
         <header className="flex shrink-0 items-center justify-between gap-3 border-b bg-background/80 px-4 py-3 backdrop-blur-2xl backdrop-saturate-150 sm:px-6">
           <div className="flex min-w-0 items-center gap-2">
             <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">

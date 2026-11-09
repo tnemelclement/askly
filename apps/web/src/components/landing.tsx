@@ -13,6 +13,7 @@ import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Comparison, Demo, HERO_SCRIPT, ScriptedChat } from './landing-demo'
+import { ProductReplay } from './product-replay'
 
 const REPO = 'https://github.com/tnemelclement/askly'
 
@@ -141,6 +142,17 @@ export function Landing() {
           </div>
           <div className="rounded-xl border bg-background p-5 shadow-lg sm:p-6">
             <ScriptedChat script={HERO_SCRIPT} loop />
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
+          <h2 className="text-3xl font-semibold tracking-tight">Ce que voit votre client</h2>
+          <p className="mt-3 max-w-2xl text-muted-foreground">
+            Il répond dans un chat, l’assistant l’aide quand il hésite, et chaque réponse se range à
+            droite, prête à être relue et corrigée avant l’envoi.
+          </p>
+          <div className="mt-8">
+            <ProductReplay />
           </div>
         </section>
 
