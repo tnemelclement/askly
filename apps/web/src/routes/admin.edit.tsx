@@ -3,8 +3,16 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, Sparkles, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { FormEditor, readDefinition } from '@/components/form-editor'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -62,6 +70,7 @@ function EditPage() {
   const [formId, setFormId] = useState(id ?? '')
   const [reusable, setReusable] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [visual, setVisual] = useState(true)
 
   useEffect(() => {
     if (existing.data) {
@@ -159,18 +168,45 @@ function EditPage() {
         <CardHeader>
           <CardTitle>Questions</CardTitle>
           <CardDescription>
-            Format YAML. Types : text, longtext, number, date, yesno, choice, multichoice, file.
-            Chaque question peut avoir une aide (help) que l’IA utilise pour expliquer.
+            {visual
+              ? 'Chaque question peut avoir une aide que l’IA utilise pour l’expliquer.'
+              : 'Format YAML. Types : text, longtext, number, date, yesno, choice, multichoice, file. Chaque question peut avoir une aide (help) que l’IA utilise pour expliquer.'}
           </CardDescription>
+          <CardAction>
+            <div className="flex rounded-lg border p-0.5">
+              {(['Visuel', 'YAML'] as const).map((label) => {
+                const on = (label === 'Visuel') === visual
+                return (
+                  <Button
+                    key={label}
+                    size="sm"
+                    variant={on ? 'secondary' : 'ghost'}
+                    aria-pressed={on}
+                    onClick={() => {
+                      if (label === 'Visuel' && !readDefinition(source))
+                        return toast.error('Le YAML est invalide : corrigez-le d’abord.')
+                      setVisual(label === 'Visuel')
+                    }}
+                  >
+                    {label}
+                  </Button>
+                )
+              })}
+            </div>
+          </CardAction>
         </CardHeader>
         <CardContent className="grid gap-4">
-          <Textarea
-            aria-label="Définition YAML"
-            spellCheck={false}
-            value={source}
-            onChange={(e) => setSource(e.target.value)}
-            className="min-h-96 font-mono text-sm"
-          />
+          {visual ? (
+            <FormEditor source={source} onChange={setSource} />
+          ) : (
+            <Textarea
+              aria-label="Définition YAML"
+              spellCheck={false}
+              value={source}
+              onChange={(e) => setSource(e.target.value)}
+              className="min-h-96 font-mono text-sm"
+            />
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
               <Label htmlFor="form-id">Identifiant</Label>
