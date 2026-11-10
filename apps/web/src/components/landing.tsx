@@ -201,7 +201,7 @@ export function Landing() {
             <p className="mt-3 text-muted-foreground">
               Sans engagement. 14 jours d'essai gratuit, toutes fonctions, 20 réponses.
             </p>
-            <div className="mt-10 grid max-w-4xl gap-6 md:grid-cols-2">
+            <div className="mt-10 grid gap-6 md:grid-cols-2">
               {PLANS.map((plan) => (
                 <div
                   key={plan.name}
