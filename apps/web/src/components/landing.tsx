@@ -65,10 +65,6 @@ const FAQ = [
     a: 'Oui, à tout moment depuis votre compte, sans engagement. L’abonnement s’arrête à la fin du mois déjà payé.',
   },
   {
-    q: 'Quelle différence avec l’auto-hébergement ?',
-    a: 'Le logiciel est le même. Hébergé, vous n’avez rien à installer, ni serveur, ni clé d’API, ni mises à jour. Auto-hébergé, c’est gratuit, mais l’installation, les sauvegardes et le coût de l’IA sont pour vous.',
-  },
-  {
     q: 'Quelle IA est utilisée ?',
     a: 'Claude, d’Anthropic. Il pose vos questions, les explique et range les réponses, mais ne valide que ce qui correspond au type attendu : le répondant relit tout avant d’envoyer.',
   },
@@ -101,9 +97,6 @@ export function Landing() {
       <main>
         <section className="mx-auto grid max-w-6xl items-center gap-12 px-4 pt-10 pb-20 sm:px-6 lg:grid-cols-2 lg:pt-20">
           <div>
-            <p className="mb-4 text-sm font-medium text-muted-foreground">
-              Logiciel libre, ou hébergé pour vous
-            </p>
             <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
               Des questionnaires auxquels on a envie de répondre.
             </h1>
@@ -124,7 +117,7 @@ export function Landing() {
               </Button>
             </div>
             <p className="mt-4 text-sm text-muted-foreground">
-              14 jours d'essai, sans carte bancaire. Ou téléchargez-le : c'est un logiciel libre.
+              14 jours d'essai, sans carte bancaire.
             </p>
           </div>
           <div className="rounded-xl border bg-background p-5 shadow-lg sm:p-6">
@@ -266,29 +259,6 @@ export function Landing() {
                 <p className="mt-3 text-muted-foreground">{a}</p>
               </details>
             ))}
-          </div>
-        </section>
-
-        <section className="border-t bg-muted/50">
-          <div className="mx-auto grid max-w-6xl gap-10 px-4 py-20 sm:px-6 lg:grid-cols-2">
-            <div>
-              <h2 className="text-3xl font-semibold tracking-tight">Préférez l'héberger ?</h2>
-              <p className="mt-4 text-muted-foreground">
-                Askly est un logiciel libre sous licence MIT. Une image Docker, une base Postgres,
-                une clé Anthropic : vous pouvez l'installer chez vous, le modifier et le
-                redistribuer.
-              </p>
-              <Button asChild size="lg" variant="outline" className="mt-8 h-11 px-5">
-                <a href={REPO}>Le dépôt sur GitHub</a>
-              </Button>
-            </div>
-            <pre className="overflow-x-auto rounded-xl bg-primary p-5 text-sm leading-relaxed text-primary-foreground">
-              <code>{`git clone ${REPO}
-cd askly && pnpm install
-cp .env.example .env
-docker compose up -d
-pnpm db:migrate && pnpm dev`}</code>
-            </pre>
           </div>
         </section>
       </main>
