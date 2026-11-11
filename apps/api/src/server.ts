@@ -35,6 +35,10 @@ const env = z
     S3_ACCESS_KEY_ID: z.string().optional(),
     S3_SECRET_ACCESS_KEY: z.string().optional(),
     S3_CREATE_BUCKET: z.stringbool().default(false),
+    // Dictée : toute API de transcription au format OpenAI (Mistral par défaut).
+    TRANSCRIBE_API_KEY: z.string().optional(),
+    TRANSCRIBE_BASE_URL: z.url().default('https://api.mistral.ai/v1'),
+    TRANSCRIBE_MODEL: z.string().default('voxtral-mini-latest'),
   })
   .parse(process.env)
 
@@ -103,6 +107,13 @@ const app = buildApp({
   publicUrl: env.PUBLIC_URL?.replace(/\/$/, ''),
   webDist: env.WEB_DIST,
   storage,
+  transcription: env.TRANSCRIBE_API_KEY
+    ? {
+        apiKey: env.TRANSCRIBE_API_KEY,
+        baseUrl: env.TRANSCRIBE_BASE_URL,
+        model: env.TRANSCRIBE_MODEL,
+      }
+    : undefined,
   // pino-pretty n'est qu'une dépendance de dev : JSON brut en production.
   logger:
     env.NODE_ENV === 'production'

@@ -14,6 +14,7 @@ import {
   UserAnswer,
 } from '@/components/conversation/conversation'
 import { QuickReplies } from '@/components/conversation/quick-replies'
+import { VoiceInput } from '@/components/conversation/voice-input'
 import { ZoomableImage } from '@/components/conversation/zoomable-image'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -44,6 +45,7 @@ interface Pending {
 interface RespondentData {
   form: Form
   respondent: { name: string; submittedAt: string | null }
+  voice: boolean
   answers: Answers
   files: Record<string, FileInfo>
   messages: { id: number; role: 'user' | 'assistant'; text: string }[]
@@ -305,6 +307,16 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
             placeholder="Votre réponse, ou une question…"
             className="max-h-40 min-h-10 resize-none border-0 bg-transparent px-3 py-2 shadow-none focus-visible:ring-0"
           />
+          {initial.voice && (
+            <VoiceInput
+              token={token}
+              disabled={streaming || locked}
+              onText={(text) => {
+                setDraft((d) => (d.trim() ? `${d.trimEnd()} ${text}` : text))
+                inputRef.current?.focus()
+              }}
+            />
+          )}
           <Button
             type="submit"
             size="icon-lg"

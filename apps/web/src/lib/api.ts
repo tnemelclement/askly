@@ -75,3 +75,14 @@ export async function uploadFile(token: string, questionId: string, file: File) 
 export const UPLOAD_ACCEPT =
   'image/*,application/pdf,.txt,.csv,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.zip'
 export const MAX_UPLOAD_MB = 20
+
+/** Dictée : envoie l'enregistrement, renvoie le texte transcrit. */
+export async function transcribeAudio(token: string, audio: Blob) {
+  const body = new FormData()
+  const ext = audio.type.includes('mp4') ? 'mp4' : audio.type.includes('ogg') ? 'ogg' : 'webm'
+  body.append('file', audio, `dictee.${ext}`)
+  const res = await fetch(`/api/r/${token}/transcribe`, { method: 'POST', body })
+  const data = (await res.json().catch(() => null)) as { error?: string; text: string } | null
+  if (!res.ok || !data) throw new ApiError(res.status, data?.error ?? `Erreur ${res.status}`)
+  return data.text
+}

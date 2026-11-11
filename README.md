@@ -92,6 +92,7 @@ secrets dans le coffre iCloud (`Secrets/repos/askly/.env.production`).
 | `ADMIN_API_TOKEN` | Jeton (32 caractères min.) du propriétaire pour l'API admin en `Bearer`. Chaque compte peut aussi créer le sien dans « Mon compte ». |
 | `SIGNUP` | `true` : inscription ouverte (service hébergé). |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_SOLO`, `STRIPE_PRICE_PRO` | Abonnements ; absents, le paiement est désactivé. |
+| `TRANSCRIBE_API_KEY`, `TRANSCRIBE_BASE_URL`, `TRANSCRIBE_MODEL` | Dictée vocale du répondant via une API au format OpenAI (`/audio/transcriptions`) : Mistral Voxtral par défaut, ou OpenAI, Groq, Whisper auto-hébergé… Sans clé, pas de micro. |
 | `PUBLIC_URL` | Adresse publique (ex. `https://ask.tnemelc.fr`) pour les liens renvoyés ; sinon déduite de la requête. |
 | `API_PORT`, `WEB_PORT` | Ports de dev (3400 et 5190 par défaut). Le front relaie `/api` vers l'API. |
 

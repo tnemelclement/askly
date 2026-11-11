@@ -76,6 +76,7 @@ import {
   type Respondent,
   saveAnswer,
 } from './store.ts'
+import { type TranscriptionConfig, transcribe } from './transcribe.ts'
 
 export interface AppOptions {
   db: Db
@@ -95,6 +96,8 @@ export interface AppOptions {
   webDist?: string
   /** Stockage S3 des images et fichiers joints ; absent, ces fonctions répondent 503. */
   storage?: Storage
+  /** Dictée vocale du répondant ; absente, le micro n'apparaît pas. */
+  transcription?: TranscriptionConfig
 }
 
 const ADMIN_COOKIE = 'admin_session'
@@ -119,6 +122,7 @@ export function buildApp({
   logger = false,
   webDist,
   storage,
+  transcription,
 }: AppOptions) {
   // trustProxy : derrière Traefik (Dokploy), pour l'IP et le protocole réels.
   const app = Fastify({ logger, trustProxy: true })
@@ -220,6 +224,7 @@ export function buildApp({
     return {
       form,
       respondent: { name: respondent.name, submittedAt: respondent.submittedAt },
+      voice: Boolean(transcription),
       ...(await conversation(form, respondent.id)),
     }
   })
@@ -326,6 +331,19 @@ export function buildApp({
       answers: await loadAnswers(db, respondent.id),
       files: await fileInfos(db, respondent.id),
     }
+  })
+
+  // Dictée : l'audio est transcrit puis rendu au répondant, qui relit avant d'envoyer.
+  const voiceLimiter = createLoginLimiter(60, 60 * 60 * 1000)
+  app.post('/api/r/:token/transcribe', async (req) => {
+    if (!transcription) throw new HttpError(404, 'Dictée non disponible')
+    const { token } = tokenParams.parse(req.params)
+    const { respondent } = await respondentOrThrow(token)
+    if (respondent.submittedAt) throw new HttpError(409, 'Réponses déjà envoyées')
+    if (voiceLimiter.blocked(token))
+      throw new HttpError(429, 'Trop de dictées, écrivez votre réponse.')
+    voiceLimiter.fail(token)
+    return { text: await transcribe(transcription, await readUpload(req)) }
   })
 
   // Le répondant retélécharge un de ses fichiers.
