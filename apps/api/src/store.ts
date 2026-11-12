@@ -6,6 +6,15 @@ import type { Answers, AnswerValue } from './domain.ts'
 
 export type Respondent = typeof respondents.$inferSelect
 
+export async function markSkipped(db: Db, respondentId: string, questionId: string) {
+  await db
+    .update(respondents)
+    .set({
+      skipped: sql`array_append(array_remove(${respondents.skipped}, ${questionId}), ${questionId})`,
+    })
+    .where(eq(respondents.id, respondentId))
+}
+
 export async function findRespondentByToken(db: Db, token: string) {
   return db.query.respondents.findFirst({ where: eq(respondents.token, token) })
 }

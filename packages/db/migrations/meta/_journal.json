@@ -29,6 +29,13 @@
       "when": 1794251912083,
       "tag": "0003_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794491463622,
+      "tag": "0004_clean_energizer",
+      "breakpoints": true
     }
   ]
 }

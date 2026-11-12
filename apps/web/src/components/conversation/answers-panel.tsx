@@ -43,6 +43,7 @@ export function answersCounterLabel(ready: number, total: number, tutorial = fal
 export function AnswersPanel({
   form,
   answers,
+  skipped = [],
   files,
   fileHref,
   onAttach,
@@ -54,6 +55,8 @@ export function AnswersPanel({
 }: {
   form: Form
   answers: Answers
+  /** Questions facultatives passées : « Passée » au lieu d'un tiret. */
+  skipped?: string[]
   /** Fichiers joints, par id, et lien pour les retélécharger. */
   files: Record<string, FileInfo>
   fileHref: (id: string) => string
@@ -141,7 +144,9 @@ export function AnswersPanel({
                         </span>
                         <span className="block text-sm break-words">
                           {state === 'empty' ? (
-                            <span className="text-muted-foreground">—</span>
+                            <span className="text-muted-foreground">
+                              {skipped.includes(q.id) ? 'Passée' : '—'}
+                            </span>
                           ) : (
                             formatAnswer(q, value, names)
                           )}

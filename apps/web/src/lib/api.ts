@@ -32,11 +32,13 @@ export async function streamChat(
   message: string | null,
   onEvent: (e: ChatEvent) => void,
   images: { mediaType: string; data: string }[] = [],
+  /** Question facultative passée avec le bouton « Passer ». */
+  skip?: string,
 ): Promise<void> {
   const res = await fetch(`/api/r/${token}/chat`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ message, images }),
+    body: JSON.stringify({ message, images, skip }),
   })
   if (res.status === 204) return
   if (!res.ok || !res.body) {

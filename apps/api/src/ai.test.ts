@@ -102,6 +102,13 @@ describe('question en attente (reprise)', () => {
       suggestions: ['Artisan', 'Commerce'],
     })
   })
+
+  it('ne revient pas sur une question passée', () => {
+    const told = { role: 'assistant' as const, display: 'Merci, vous pouvez envoyer.', content: [] }
+    const answers = { activite: 'Artisan', offre: 'A' }
+    expect(pendingQuestion(form, [user('Je passe'), told], answers, ['ok'])).toBeNull()
+    expect(pendingQuestion(form, [present('ok')], answers, ['ok'])).toBeNull()
+  })
 })
 
 describe('images du répondant', () => {

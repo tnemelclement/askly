@@ -1,0 +1,1 @@
+ALTER TABLE "respondents" ADD COLUMN "skipped" text[] DEFAULT '{}'::text[] NOT NULL;

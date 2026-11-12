@@ -16,12 +16,14 @@ export function QuickReplies({
   question,
   suggestions,
   onSend,
+  onSkip,
   onAttach,
   uploading = false,
 }: {
   question: Question
   suggestions: string[]
   onSend: (text: string) => void
+  onSkip: () => void
   /** Question `file` : fichiers choisis par le répondant. */
   onAttach?: (files: File[]) => void
   uploading?: boolean
@@ -29,12 +31,7 @@ export function QuickReplies({
   const [selected, setSelected] = useState<string[]>([])
   // Question facultative : on peut la passer sans y répondre (l'IA la laisse vide).
   const skip = !question.required && (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      onClick={() => onSend('Je passe cette question')}
-    >
+    <Button type="button" variant="ghost" size="sm" onClick={onSkip}>
       Passer
     </Button>
   )

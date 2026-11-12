@@ -75,6 +75,7 @@ import {
   findRespondentByToken,
   loadAnswers,
   loadMessages,
+  markSkipped,
   markStarted,
   markSubmitted,
   type Respondent,
@@ -217,14 +218,15 @@ export function buildApp({
     return { respondent, form: await formOrThrow(db, respondent.accountId, respondent.formId) }
   }
 
-  async function conversation(form: Form, respondentId: string) {
-    const rows = await loadMessages(db, respondentId)
-    const answers = await loadAnswers(db, respondentId)
+  async function conversation(form: Form, respondent: Respondent) {
+    const rows = await loadMessages(db, respondent.id)
+    const answers = await loadAnswers(db, respondent.id)
     return {
       answers,
-      files: await fileInfos(db, respondentId),
+      skipped: respondent.skipped,
+      files: await fileInfos(db, respondent.id),
       messages: visibleMessages(rows),
-      pending: pendingQuestion(form, rows, answers),
+      pending: pendingQuestion(form, rows, answers, respondent.skipped),
     }
   }
 
@@ -256,7 +258,7 @@ export function buildApp({
       form,
       respondent: { name: respondent.name, submittedAt: respondent.submittedAt },
       voice: Boolean(transcription),
-      ...(await conversation(form, respondent.id)),
+      ...(await conversation(form, respondent)),
     }
   })
 
@@ -271,6 +273,8 @@ export function buildApp({
       .object({
         message: z.string().trim().max(MAX_MESSAGE_LENGTH).nullable(),
         images: z.array(chatImageSchema).max(MAX_CHAT_IMAGES).default([]),
+        /** Bouton « Passer » sous une question facultative. */
+        skip: z.string().max(100).optional(),
       })
       .parse(req.body)
     const { images } = body
@@ -288,6 +292,11 @@ export function buildApp({
     await assertCanStart(respondent)
     if (busy.has(respondent.id)) throw new HttpError(409, 'Une réponse est déjà en cours')
     busy.add(respondent.id)
+    const skipped = allQuestions(form).find((q) => q.id === body.skip && !q.required)
+    if (skipped) {
+      await markSkipped(db, respondent.id, skipped.id)
+      respondent.skipped = [...respondent.skipped.filter((id) => id !== skipped.id), skipped.id]
+    }
 
     // Flux NDJSON : un événement `ChatEvent` par ligne.
     const out = new PassThrough()

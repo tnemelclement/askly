@@ -74,6 +74,8 @@ export const respondents = pgTable('respondents', {
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   startedAt: timestamp({ withTimezone: true }),
   submittedAt: timestamp({ withTimezone: true }),
+  /** Questions facultatives passées avec « Passer » : ni reposées, ni proposées. */
+  skipped: text().array().notNull().default(sql`'{}'::text[]`),
 })
 
 /** Réponse validée à une question ; `source` dit si elle vient de l'IA ou d'une correction. */

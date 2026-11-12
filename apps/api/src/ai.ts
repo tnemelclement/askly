@@ -80,7 +80,7 @@ Règles :
 - Dès qu'une réponse est claire, enregistrez-la avec l'outil ${RECORD_ANSWER_TOOL}, puis enchaînez. Une réponse peut en couvrir plusieurs : enregistrez chacune.
 - Si la réponse est ambiguë ou incomplète, demandez une précision au lieu de deviner. N'inventez jamais une réponse.
 - Si la personne corrige une réponse précédente, réenregistrez-la.
-- Seule une question marquée facultative peut être passée, si la personne ne souhaite pas répondre ; ne proposez jamais de passer une autre question. Sous une question facultative, un bouton « Passer » est affiché : si la personne passe, ne l'enregistrez pas et enchaînez.
+- Seule une question marquée facultative peut être passée, si la personne ne souhaite pas répondre ; ne proposez jamais de passer une autre question. Sous une question facultative, un bouton « Passer » est affiché : si la personne passe, ne l'enregistrez pas, n'y revenez plus et enchaînez.
 - Pour une question de type fichier, invitez la personne à utiliser le bouton « Joindre un fichier » ; quand elle a joint ses fichiers, son message l'indique (les noms apparaissent dans l'état), enchaînez.
 - Ne citez jamais un bouton qui n'est pas affiché : seuls existent ceux décrits ici.
 - Si l'outil renvoie une erreur, corrigez la valeur ou reposez la question.
@@ -195,10 +195,11 @@ export function describeState(
   form: Form,
   answers: Answers,
   fileNames: Record<string, string> = {},
+  skipped: string[] = [],
 ): string {
   const lines = allQuestions(form).map((q) =>
     answers[q.id] === undefined
-      ? `- ${q.id} : (vide)${q.required ? '' : ' facultative'}`
+      ? `- ${q.id} : ${skipped.includes(q.id) ? '(passée par la personne, ne pas y revenir)' : `(vide)${q.required ? '' : ' facultative'}`}`
       : `- ${q.id} : ${formatAnswer(q, answers[q.id], fileNames)}`,
   )
   const missing = missingRequired(form, answers).length
@@ -279,7 +280,7 @@ export async function runTurn(opts: {
   const names = Object.fromEntries(
     Object.values(await fileInfos(db, respondent.id)).map((f) => [f.id, f.filename]),
   )
-  const state = describeState(form, await loadAnswers(db, respondent.id), names)
+  const state = describeState(form, await loadAnswers(db, respondent.id), names, respondent.skipped)
   await appendMessages(db, respondent.id, [
     {
       role: 'user',
@@ -384,6 +385,7 @@ export async function runTurn(opts: {
       form,
       await loadMessages(db, respondent.id),
       await loadAnswers(db, respondent.id),
+      respondent.skipped,
     )
     if (pending) emit({ type: 'question', ...pending })
   }
@@ -409,6 +411,7 @@ export function pendingQuestion(
   form: Form,
   rows: { role: 'user' | 'assistant'; content: unknown[]; display: string | null }[],
   answers: Answers,
+  skipped: string[] = [],
 ): { questionId: string; suggestions: string[] } | null {
   let pending: { questionId: string; suggestions: string[] } | null = null
   let lastText: string | null = null
@@ -420,14 +423,14 @@ export function pendingQuestion(
       if (block.type !== 'tool_use' || block.name !== PRESENT_QUESTION_TOOL) continue
       const input = presentInputSchema.safeParse(block.input)
       const q = input.success && allQuestions(form).find((x) => x.id === input.data.question_id)
-      if (q)
+      if (q && !skipped.includes(q.id))
         pending = { questionId: q.id, suggestions: mergeSuggestions(q, input.data.suggestions) }
     }
   }
   // L'IA a la main (pas de message du répondant en attente) : sa question, posée ou non
   // avec un « ? » (« Décrivez… »), est a priori la suivante.
   if (pending || lastText === null) return pending
-  const next = nextQuestion(form, answers)
+  const next = nextQuestion(form, answers, skipped)
   return next ? { questionId: next.id, suggestions: mergeSuggestions(next, []) } : null
 }
 
@@ -435,10 +438,14 @@ export function pendingQuestion(
  * Question que l'IA pose a priori : la première vide après la dernière remplie (une
  * facultative passée reste vide derrière), sinon la première vide.
  */
-export function nextQuestion(form: Form, answers: Answers): Question | undefined {
+export function nextQuestion(
+  form: Form,
+  answers: Answers,
+  skipped: string[] = [],
+): Question | undefined {
   const all = allQuestions(form)
-  const last = all.findLastIndex((q) => answers[q.id] !== undefined)
-  const empty = (q: Question) => answers[q.id] === undefined
+  const last = all.findLastIndex((q) => answers[q.id] !== undefined || skipped.includes(q.id))
+  const empty = (q: Question) => answers[q.id] === undefined && !skipped.includes(q.id)
   return all.slice(last + 1).find(empty) ?? all.find(empty)
 }
 

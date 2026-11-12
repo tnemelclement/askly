@@ -53,6 +53,7 @@ interface RespondentData {
   respondent: { name: string; submittedAt: string | null }
   voice: boolean
   answers: Answers
+  skipped: string[]
   files: Record<string, FileInfo>
   messages: { id: number; role: 'user' | 'assistant'; text: string; images?: string[] }[]
   pending: Pending | null
@@ -130,6 +131,7 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
     initial.messages.map((m) => ({ ...m, id: String(m.id) })),
   )
   const [answers, setAnswers] = useState<Answers>(initial.answers)
+  const [skipped, setSkipped] = useState(initial.skipped)
   const [files, setFiles] = useState(initial.files)
   const [uploading, setUploading] = useState(false)
   const [locked, setLocked] = useState(Boolean(initial.respondent.submittedAt))
@@ -146,8 +148,9 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const kickedOff = useRef(false)
 
-  async function send(message: string | null, images: StagedImage[] = []) {
+  async function send(message: string | null, images: StagedImage[] = [], skip?: string) {
     setPending(null)
+    if (skip) setSkipped((s) => [...s, skip])
     setStreaming(true)
     setWaiting(true)
     if (message || images.length) {
@@ -191,6 +194,7 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
         message,
         onEvent,
         images.map(({ mediaType, data }) => ({ mediaType, data })),
+        skip,
       )
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erreur réseau')
@@ -312,6 +316,7 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
         <AnswersPanel
           form={form}
           answers={answers}
+          skipped={skipped}
           files={files}
           fileHref={(id) => `/api/r/${token}/files/${id}`}
           onAttach={(questionId, list) => attach(questionId, list, false)}
@@ -466,6 +471,7 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
               question={pendingQuestion}
               suggestions={pending?.suggestions ?? []}
               onSend={(text) => void send(text)}
+              onSkip={() => void send('Je passe cette question', [], pendingQuestion.id)}
             />
           </li>
         )}
