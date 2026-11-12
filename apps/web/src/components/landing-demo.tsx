@@ -110,7 +110,7 @@ export function ScriptedChat({ script, loop = false }: { script: Line[]; loop?: 
   const reduced = usePrefersReducedMotion()
   const [shown, setShown] = useState(reduced ? script.length : 0)
   // Ne joue que visible à l'écran : sinon la conversation est finie avant qu'on y arrive.
-  const ref = useRef<HTMLOListElement>(null)
+  const ref = useRef<HTMLDivElement>(null)
   const [visible, setVisible] = useState(false)
   useEffect(() => {
     const observer = new IntersectionObserver(([e]) => setVisible(Boolean(e?.isIntersecting)), {
@@ -133,13 +133,20 @@ export function ScriptedChat({ script, loop = false }: { script: Line[]; loop?: 
   const next = script[shown]
   return (
     // Décor : la conversation jouée n'est pas annoncée aux lecteurs d'écran ligne à ligne.
-    <ol ref={ref} className="flex min-h-80 flex-col gap-4" aria-hidden>
-      {script.slice(0, shown).map((line, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: script fixe, rejoué du début.
-        <ScriptLine key={i} line={line} />
-      ))}
-      {next && 'ai' in next && <ThinkingMessage />}
-    </ol>
+    // Hauteur fixe, calée en bas : les nouveaux messages poussent les anciens vers le haut
+    // au lieu d'agrandir la carte (et de faire bouger la page).
+    <div
+      ref={ref}
+      className="flex h-96 flex-col justify-end overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,black_3rem)]"
+    >
+      <ol className="flex flex-col gap-4" aria-hidden>
+        {script.slice(0, shown).map((line, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: script fixe, rejoué du début.
+          <ScriptLine key={i} line={line} />
+        ))}
+        {next && 'ai' in next && <ThinkingMessage />}
+      </ol>
+    </div>
   )
 }
 
