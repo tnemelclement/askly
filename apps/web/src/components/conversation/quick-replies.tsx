@@ -27,6 +27,17 @@ export function QuickReplies({
   uploading?: boolean
 }) {
   const [selected, setSelected] = useState<string[]>([])
+  // Question facultative : on peut la passer sans y répondre (l'IA la laisse vide).
+  const skip = !question.required && (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      onClick={() => onSend('Je passe cette question')}
+    >
+      Passer
+    </Button>
+  )
 
   if (question.type === 'file') {
     return (
@@ -35,6 +46,7 @@ export function QuickReplies({
         <span className="text-xs text-muted-foreground">
           Photos, PDF ou documents, {MAX_UPLOAD_MB} Mo maximum chacun
         </span>
+        {skip}
       </div>
     )
   }
@@ -74,6 +86,7 @@ export function QuickReplies({
         >
           Valider
         </Button>
+        {skip}
       </fieldset>
     )
   }
@@ -86,7 +99,7 @@ export function QuickReplies({
         : question.options
           ? question.options
           : suggestions
-  if (choices.length === 0) return null
+  if (choices.length === 0 && !skip) return null
 
   return (
     <fieldset className="ml-11 flex flex-wrap gap-2" aria-label="Réponses proposées">
@@ -102,6 +115,7 @@ export function QuickReplies({
           {c}
         </Button>
       ))}
+      {skip}
     </fieldset>
   )
 }
