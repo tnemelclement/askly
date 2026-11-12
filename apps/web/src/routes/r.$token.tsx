@@ -2,7 +2,7 @@ import type { Answers, AnswerValue, Form } from '@askly/api/domain'
 import { allQuestions } from '@askly/api/domain'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { ArrowUp, ArrowUpRight, CircleCheck, ImagePlus, X } from 'lucide-react'
+import { ArrowUp, ArrowUpRight, Check, CircleCheck, ImagePlus, Sparkles, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { ClassicForm } from '@/components/classic-form'
@@ -96,7 +96,7 @@ function Submitted({ form }: { form: Form }) {
   const demo = form.id.startsWith('demo-')
   return (
     <div className="h-dvh bg-muted sm:p-6">
-      <div className="mx-auto flex h-full max-w-6xl flex-col items-center justify-center gap-4 overflow-hidden bg-background p-6 text-center sm:rounded-xl sm:border sm:shadow-lg">
+      <div className="mx-auto flex h-full max-w-6xl flex-col items-center justify-center gap-4 overflow-y-auto bg-background p-6 text-center sm:rounded-xl sm:border sm:shadow-lg">
         <CircleCheck className="size-16 text-primary" aria-hidden />
         <p className="text-lg font-medium">
           {form.kind === 'tutorial'
@@ -121,24 +121,61 @@ function Submitted({ form }: { form: Form }) {
           </>
         )}
         {/* Chaque répondant découvre le produit : petite invitation, sans insister. */}
-        {!demo && (
-          <aside className="mt-6 w-full max-w-sm rounded-xl border bg-muted/50 p-4 text-left">
-            <p className="text-sm font-medium">
-              {form.kind === 'tutorial' ? 'Ce tutoriel' : 'Ce questionnaire'} a été fait avec Askly
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Vous aussi, faites remplir vos questionnaires ou guidez vos clients par une
-              conversation, sans les appeler.
-            </p>
-            <Button asChild size="sm" variant="outline" className="mt-3">
-              <a href="/" target="_blank" rel="noreferrer">
-                Essayer Askly <ArrowUpRight />
-              </a>
-            </Button>
-          </aside>
-        )}
+        {!demo && <TryAskly tutorial={form.kind === 'tutorial'} />}
       </div>
     </div>
+  )
+}
+
+/** Fin de parcours : le répondant vient de tester le produit, on l'invite à l'utiliser. */
+function TryAskly({ tutorial }: { tutorial: boolean }) {
+  const points = tutorial
+    ? [
+        'Décrivez les étapes, l’IA guide vos clients une par une',
+        'Elle aide quand ça bloque, captures d’écran à l’appui',
+        'Vous voyez qui a terminé, sans passer un appel',
+      ]
+    : [
+        'Décrivez ce que vous voulez savoir, l’IA écrit le questionnaire',
+        'Un lien à envoyer par WhatsApp ou par mail',
+        'Des réponses complètes et claires, prêtes à exporter',
+      ]
+  return (
+    <aside className="mt-8 w-full max-w-md rounded-2xl bg-primary p-6 text-left text-primary-foreground shadow-lg">
+      <p className="flex items-center gap-2 text-xs font-medium tracking-wide uppercase opacity-70">
+        <Sparkles className="size-3.5" aria-hidden /> Fait avec Askly
+      </p>
+      <p className="mt-3 text-xl leading-snug font-semibold text-balance">
+        {tutorial
+          ? 'Guidez vos clients comme ça, sans décrocher le téléphone.'
+          : 'C’était simple ? Vos clients trouveront ça simple aussi.'}
+      </p>
+      <ul className="mt-4 grid gap-2 text-sm">
+        {points.map((p) => (
+          <li key={p} className="flex gap-2">
+            <Check className="mt-0.5 size-4 shrink-0 opacity-70" aria-hidden />
+            {p}
+          </li>
+        ))}
+      </ul>
+      <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <Button asChild variant="secondary">
+          <a href="/signup" target="_blank" rel="noreferrer">
+            {tutorial ? 'Créer mon premier tutoriel' : 'Créer mon premier questionnaire'}
+            <ArrowUpRight />
+          </a>
+        </Button>
+        <a
+          href="/"
+          target="_blank"
+          rel="noreferrer"
+          className="text-sm underline-offset-4 opacity-80 hover:underline hover:opacity-100"
+        >
+          Voir comment ça marche
+        </a>
+      </div>
+      <p className="mt-3 text-xs opacity-60">14 jours gratuits, sans carte bancaire.</p>
+    </aside>
   )
 }
 
