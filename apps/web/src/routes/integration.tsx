@@ -10,21 +10,10 @@ import {
   UserPlus,
   Wrench,
 } from 'lucide-react'
-import { type Line, ScriptedChat } from '@/components/landing-demo'
+import { REVIEW_SCRIPT, ScriptedChat } from '@/components/landing-demo'
 import { BrowserFrame, CtaBand, FeatureCard, PageHero, SitePage } from '@/components/site'
 
 export const Route = createFileRoute('/integration')({ component: IntegrationPage })
-
-const SCRIPT: Line[] = [
-  { ai: 'Bonjour ! Quelle note donneriez-vous à votre commande ?' },
-  { chips: ['5 - Excellent', '4 - Très bien', '3 - Correct'] },
-  { user: '5 - Excellent' },
-  { ai: 'Merci ! Qu’avez-vous le plus apprécié ?' },
-  { chips: ['Le goût', 'La fraîcheur', 'L’accueil'] },
-  { user: 'Le pain au levain, encore tiède à 7 h' },
-  { ai: 'Ça fait plaisir. Pouvons-nous publier votre avis sur notre site ?' },
-  { user: 'Oui, avec mon prénom' },
-]
 
 const IFRAME = `<iframe src="https://ask.tnemelc.fr/f/VOTRE-LIEN"
   title="Votre avis" width="100%" height="640"
@@ -158,7 +147,7 @@ function SiteMock() {
               Votre avis sur la boulangerie
             </div>
             <div className="px-4 pb-4 text-foreground [&>div]:h-72">
-              <ScriptedChat script={SCRIPT} loop />
+              <ScriptedChat script={REVIEW_SCRIPT} loop />
             </div>
           </div>
         </div>

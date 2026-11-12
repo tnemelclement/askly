@@ -13,26 +13,11 @@ import {
   Printer,
   ShieldCheck,
 } from 'lucide-react'
-import { type Line, ScriptedChat } from '@/components/landing-demo'
+import { ScriptedChat, TUTORIAL_SCRIPT } from '@/components/landing-demo'
 import { BrowserFrame, CtaBand, FeatureCard, PageHero, SitePage } from '@/components/site'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/tutoriels')({ component: TutorialsPage })
-
-const SCRIPT: Line[] = [
-  {
-    ai: 'Étape 1 : connectez-vous à votre compte Gandi, puis ouvrez **Noms de domaine**. Dites-moi quand c’est fait.',
-  },
-  { chips: ['C’est fait', 'Je bloque'] },
-  { user: 'Je bloque, je ne trouve pas' },
-  { ai: 'Pas de souci. Que voyez-vous à l’écran ? Vous pouvez m’envoyer une capture.' },
-  { file: 'capture-gandi.png' },
-  {
-    ai: 'Merci ! Vous êtes sur l’accueil. Cliquez sur **Domaines** dans le menu de gauche, puis sur boulangerie-martin.fr.',
-  },
-  { user: 'Ah oui, ça y est' },
-  { ai: 'Parfait, c’est coché. Étape 2 : ouvrez l’onglet **Enregistrements DNS**.' },
-]
 
 const STEPS = [
   { label: 'Ouvrir les noms de domaine', done: true },
@@ -51,7 +36,7 @@ function TutorialsPage() {
           <BrowserFrame url="ask.tnemelc.fr/r/…">
             <div className="grid sm:grid-cols-[1fr_190px]">
               <div className="p-5">
-                <ScriptedChat script={SCRIPT} loop />
+                <ScriptedChat script={TUTORIAL_SCRIPT} loop />
               </div>
               <aside className="hidden border-l bg-muted/50 p-4 sm:block" aria-hidden>
                 <p className="text-sm font-semibold">Étapes</p>

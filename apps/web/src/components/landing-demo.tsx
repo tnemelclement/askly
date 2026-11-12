@@ -102,11 +102,48 @@ export const SCENARIOS: Scenario[] = [
 const STEP_MS = 1300
 /** Le scénario agence web, joué en boucle à côté du titre. */
 export const HERO_SCRIPT = (SCENARIOS[1] as Scenario).script
+/** Tutoriel : un client guidé dans ses réglages DNS. */
+export const TUTORIAL_SCRIPT: Line[] = [
+  {
+    ai: 'Étape 1 : connectez-vous à votre compte Gandi, puis ouvrez **Noms de domaine**. Dites-moi quand c’est fait.',
+  },
+  { chips: ['C’est fait', 'Je bloque'] },
+  { user: 'Je bloque, je ne trouve pas' },
+  { ai: 'Pas de souci. Que voyez-vous à l’écran ? Vous pouvez m’envoyer une capture.' },
+  { file: 'capture-gandi.png' },
+  {
+    ai: 'Merci ! Vous êtes sur l’accueil. Cliquez sur **Domaines** dans le menu de gauche, puis sur boulangerie-martin.fr.',
+  },
+  { user: 'Ah oui, ça y est' },
+  { ai: 'Parfait, c’est coché. Étape 2 : ouvrez l’onglet **Enregistrements DNS**.' },
+]
+
+/** Demande d'avis intégrée dans un site. */
+export const REVIEW_SCRIPT: Line[] = [
+  { ai: 'Bonjour ! Quelle note donneriez-vous à votre commande ?' },
+  { chips: ['5 - Excellent', '4 - Très bien', '3 - Correct'] },
+  { user: '5 - Excellent' },
+  { ai: 'Merci ! Qu’avez-vous le plus apprécié ?' },
+  { chips: ['Le goût', 'La fraîcheur', 'L’accueil'] },
+  { user: 'Le pain au levain, encore tiède à 7 h' },
+  { ai: 'Ça fait plaisir. Pouvons-nous publier votre avis sur notre site ?' },
+  { user: 'Oui, avec mon prénom' },
+]
+
 /** Le passage « surface » du scénario artisan, en regard du formulaire classique. */
 const COMPARISON_SCRIPT = (SCENARIOS[0] as Scenario).script.slice(3, 7)
 
 /** Conversation jouée ligne à ligne (tout d'un coup si l'animation est réduite). */
-export function ScriptedChat({ script, loop = false }: { script: Line[]; loop?: boolean }) {
+export function ScriptedChat({
+  script,
+  loop = false,
+  onDone,
+}: {
+  script: Line[]
+  loop?: boolean
+  /** Appelé un moment après la fin, à la place de rejouer (enchaîner sur un autre script). */
+  onDone?: () => void
+}) {
   const reduced = usePrefersReducedMotion()
   const [shown, setShown] = useState(reduced ? script.length : 0)
   // Ne joue que visible à l'écran : sinon la conversation est finie avant qu'on y arrive.
@@ -125,10 +162,13 @@ export function ScriptedChat({ script, loop = false }: { script: Line[]; loop?: 
   useEffect(() => {
     if (reduced || !visible) return
     const done = shown >= script.length
-    if (done && !loop) return
-    const timer = setTimeout(() => setShown(done ? 0 : shown + 1), done ? 4000 : STEP_MS)
+    if (done && !loop && !onDone) return
+    const timer = setTimeout(
+      () => (done && onDone ? onDone() : setShown(done ? 0 : shown + 1)),
+      done ? 4000 : STEP_MS,
+    )
     return () => clearTimeout(timer)
-  }, [shown, script, loop, reduced, visible])
+  }, [shown, script, loop, reduced, visible, onDone])
 
   const next = script[shown]
   return (
@@ -403,6 +443,47 @@ function ClassicFormMock() {
       <p className="mt-5 text-sm text-muted-foreground">
         « C’est quoi un lot ? Je mets quoi pour la surface ? »… et l’onglet se ferme.
       </p>
+    </div>
+  )
+}
+
+const HERO_USES = [
+  { label: 'Questionnaire', script: HERO_SCRIPT },
+  { label: 'Tutoriel', script: TUTORIAL_SCRIPT },
+  { label: 'Avis sur votre site', script: REVIEW_SCRIPT },
+]
+
+/** Conversation du haut de page : les trois usages joués l'un après l'autre. */
+export function HeroChat() {
+  const [index, setIndex] = useState(0)
+  const use = HERO_USES[index] as (typeof HERO_USES)[number]
+  return (
+    <div className="rounded-xl border bg-background shadow-lg">
+      <div className="flex flex-wrap gap-1.5 border-b p-3">
+        {HERO_USES.map((u, i) => (
+          <button
+            key={u.label}
+            type="button"
+            onClick={() => setIndex(i)}
+            aria-pressed={i === index}
+            className={cn(
+              'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+              i === index
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+            )}
+          >
+            {u.label}
+          </button>
+        ))}
+      </div>
+      <div className="p-5 sm:p-6">
+        <ScriptedChat
+          key={index}
+          script={use.script}
+          onDone={() => setIndex((i) => (i + 1) % HERO_USES.length)}
+        />
+      </div>
     </div>
   )
 }

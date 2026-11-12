@@ -15,7 +15,7 @@ import {
 import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { Comparison, Demo, HERO_SCRIPT, ScriptedChat } from './landing-demo'
+import { Comparison, Demo, HeroChat } from './landing-demo'
 import { ProductReplay } from './product-replay'
 import { SiteFooter, SiteHeader } from './site'
 
@@ -86,13 +86,12 @@ export function Landing() {
         <section className="mx-auto grid max-w-6xl items-center gap-12 px-4 pt-10 pb-20 sm:px-6 lg:grid-cols-2 lg:pt-20">
           <div>
             <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-              Des questionnaires auxquels on a envie de répondre.
+              Ce que vous demandez à vos clients, en conversation.
             </h1>
             <p className="mt-5 max-w-xl text-lg text-muted-foreground text-pretty">
-              Askly remplace le formulaire par une conversation. Une IA pose vos questions une à
-              une, les explique quand on hésite, propose des réponses en un clic et range les
-              réponses au fil de l'échange. Vous recevez des réponses complètes, pas des champs
-              vides.
+              Un questionnaire à remplir, un réglage à faire, un avis à donner : une IA mène
+              l’échange, explique quand on hésite, guide quand on bloque et range tout au fil de la
+              conversation. Vous recevez des réponses complètes, pas des champs vides.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button asChild size="lg" className="h-11 px-5">
@@ -108,46 +107,10 @@ export function Landing() {
               14 jours d'essai, sans carte bancaire.
             </p>
           </div>
-          <div className="rounded-xl border bg-background p-5 shadow-lg sm:p-6">
-            <ScriptedChat script={HERO_SCRIPT} loop />
-          </div>
+          <HeroChat />
         </section>
 
         <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
-          <h2 className="text-3xl font-semibold tracking-tight">Ce que voit votre client</h2>
-          <p className="mt-3 max-w-2xl text-muted-foreground">
-            Il répond dans un chat, l’assistant l’aide quand il hésite, et chaque réponse se range à
-            droite, prête à être relue et corrigée avant l’envoi.
-          </p>
-          <div className="mt-8">
-            <ProductReplay />
-          </div>
-        </section>
-
-        <Comparison />
-        <Demo />
-
-        <section className="border-y bg-muted/50">
-          <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-            <h2 className="text-3xl font-semibold tracking-tight">Comment ça marche</h2>
-            <ol className="mt-10 grid gap-8 md:grid-cols-3">
-              <Step n={1} title="Vous écrivez les questions">
-                Depuis l'administration, ou en demandant à Claude : « fais-moi un questionnaire pour
-                Dupont sur son projet de cuisine ».
-              </Step>
-              <Step n={2} title="Vous envoyez un lien">
-                Chaque personne a son lien. Elle répond quand elle veut, s'arrête et reprend où elle
-                en était.
-              </Step>
-              <Step n={3} title="Vous lisez les réponses">
-                Rangées question par question, fichiers joints compris, dans l'administration ou en
-                export CSV.
-              </Step>
-            </ol>
-          </div>
-        </section>
-
-        <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
           <h2 className="text-3xl font-semibold tracking-tight">Trois façons de l’utiliser</h2>
           <p className="mt-3 max-w-2xl text-muted-foreground">
             Un questionnaire envoyé à vos clients, un tutoriel qui les guide pas à pas, ou un
@@ -174,10 +137,44 @@ export function Landing() {
           </div>
         </section>
 
+        <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
+          <h2 className="text-3xl font-semibold tracking-tight">Ce que voit votre client</h2>
+          <p className="mt-3 max-w-2xl text-muted-foreground">
+            Il répond dans un chat, l’assistant l’aide quand il hésite, et chaque réponse se range à
+            droite, prête à être relue et corrigée avant l’envoi.
+          </p>
+          <div className="mt-8">
+            <ProductReplay />
+          </div>
+        </section>
+
+        <Comparison />
+        <Demo />
+
+        <section className="border-y bg-muted/50">
+          <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
+            <h2 className="text-3xl font-semibold tracking-tight">Comment ça marche</h2>
+            <ol className="mt-10 grid gap-8 md:grid-cols-3">
+              <Step n={1} title="Vous préparez">
+                Les questions d’un questionnaire ou les étapes d’un tutoriel. Ou décrivez ce que
+                vous voulez : l’IA le rédige, vous ajustez.
+              </Step>
+              <Step n={2} title="Vous partagez">
+                Un lien par personne, par mail ou WhatsApp, ou un lien public intégré dans votre
+                site. On répond quand on veut, on reprend où on en était.
+              </Step>
+              <Step n={3} title="Vous recevez">
+                Réponses rangées, étapes cochées, fichiers et captures, toute la conversation : dans
+                l’administration ou en export CSV.
+              </Step>
+            </ol>
+          </div>
+        </section>
+
         <section>
-          <div className="mx-auto max-w-6xl px-4 pt-4 pb-20 sm:px-6">
+          <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
             <h2 className="text-3xl font-semibold tracking-tight">
-              Ce qui change pour le répondant
+              Ce qui change pour vos clients
             </h2>
             <div className="mt-10 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
               <Feature icon={MessagesSquare} title="Une question à la fois">
