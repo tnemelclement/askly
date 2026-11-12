@@ -2,7 +2,7 @@ import type { Answers, AnswerValue, Form } from '@askly/api/domain'
 import { allQuestions } from '@askly/api/domain'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { ArrowUp, ArrowUpRight, Check, CircleCheck, ImagePlus, Sparkles, X } from 'lucide-react'
+import { ArrowUp, ArrowUpRight, CircleCheck, ImagePlus, Sparkles, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { ClassicForm } from '@/components/classic-form'
@@ -96,31 +96,33 @@ function Submitted({ form }: { form: Form }) {
   const demo = form.id.startsWith('demo-')
   return (
     <div className="h-dvh bg-muted sm:p-6">
-      <div className="mx-auto flex h-full max-w-6xl flex-col items-center justify-center gap-4 overflow-y-auto bg-background p-6 text-center sm:rounded-xl sm:border sm:shadow-lg">
-        <CircleCheck className="size-16 text-primary" aria-hidden />
-        <p className="text-lg font-medium">
-          {form.kind === 'tutorial'
-            ? 'Bravo, c’est terminé. Merci !'
-            : 'Vos réponses ont été envoyées. Merci !'}
-        </p>
-        {/* Démo de la page d'accueil : on propose la suite. */}
-        {demo && (
-          <>
-            <p className="max-w-md text-muted-foreground">
-              C'est ce que vivront vos clients. Créez vos propres questionnaires en décrivant ce que
-              vous voulez savoir.
-            </p>
-            <div className="flex flex-wrap justify-center gap-3">
-              <Button asChild size="lg">
-                <a href="/signup">Essai gratuit de 14 jours</a>
-              </Button>
-              <Button asChild size="lg" variant="outline">
-                <a href="/#demo">Retour à la démo</a>
-              </Button>
-            </div>
-          </>
-        )}
-        {/* Chaque répondant découvre le produit : petite invitation, sans insister. */}
+      <div className="mx-auto flex h-full max-w-6xl flex-col overflow-hidden bg-background sm:rounded-xl sm:border sm:shadow-lg">
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 overflow-y-auto p-6 text-center">
+          <CircleCheck className="size-16 text-primary" aria-hidden />
+          <p className="text-lg font-medium">
+            {form.kind === 'tutorial'
+              ? 'Bravo, c’est terminé. Merci !'
+              : 'Vos réponses ont été envoyées. Merci !'}
+          </p>
+          {/* Démo de la page d'accueil : on propose la suite. */}
+          {demo && (
+            <>
+              <p className="max-w-md text-muted-foreground">
+                C'est ce que vivront vos clients. Créez vos propres questionnaires en décrivant ce
+                que vous voulez savoir.
+              </p>
+              <div className="flex flex-wrap justify-center gap-3">
+                <Button asChild size="lg">
+                  <a href="/signup">Essai gratuit de 14 jours</a>
+                </Button>
+                <Button asChild size="lg" variant="outline">
+                  <a href="/#demo">Retour à la démo</a>
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+        {/* Chaque répondant découvre le produit : bannière en bas du cadre. */}
         {!demo && <TryAskly tutorial={form.kind === 'tutorial'} />}
       </div>
     </div>
@@ -129,52 +131,42 @@ function Submitted({ form }: { form: Form }) {
 
 /** Fin de parcours : le répondant vient de tester le produit, on l'invite à l'utiliser. */
 function TryAskly({ tutorial }: { tutorial: boolean }) {
-  const points = tutorial
-    ? [
-        'Décrivez les étapes, l’IA guide vos clients une par une',
-        'Elle aide quand ça bloque, captures d’écran à l’appui',
-        'Vous voyez qui a terminé, sans passer un appel',
-      ]
-    : [
-        'Décrivez ce que vous voulez savoir, l’IA écrit le questionnaire',
-        'Un lien à envoyer par WhatsApp ou par mail',
-        'Des réponses complètes et claires, prêtes à exporter',
-      ]
   return (
-    <aside className="mt-8 w-full max-w-md rounded-2xl bg-primary p-6 text-left text-primary-foreground shadow-lg">
-      <p className="flex items-center gap-2 text-xs font-medium tracking-wide uppercase opacity-70">
-        <Sparkles className="size-3.5" aria-hidden /> Fait avec Askly
-      </p>
-      <p className="mt-3 text-xl leading-snug font-semibold text-balance">
-        {tutorial
-          ? 'Guidez vos clients comme ça, sans décrocher le téléphone.'
-          : 'C’était simple ? Vos clients trouveront ça simple aussi.'}
-      </p>
-      <ul className="mt-4 grid gap-2 text-sm">
-        {points.map((p) => (
-          <li key={p} className="flex gap-2">
-            <Check className="mt-0.5 size-4 shrink-0 opacity-70" aria-hidden />
-            {p}
-          </li>
-        ))}
-      </ul>
-      <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <Button asChild variant="secondary">
-          <a href="/signup" target="_blank" rel="noreferrer">
-            {tutorial ? 'Créer mon premier tutoriel' : 'Créer mon premier questionnaire'}
-            <ArrowUpRight />
-          </a>
-        </Button>
+    <aside className="flex flex-col gap-4 bg-primary px-6 py-5 text-primary-foreground sm:flex-row sm:items-center sm:justify-between sm:px-8">
+      <div className="flex items-start gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-foreground/10">
+          <Sparkles className="size-4" aria-hidden />
+        </span>
+        <div>
+          <p className="font-semibold">
+            {tutorial
+              ? 'Guidez vos clients comme ça, sans décrocher le téléphone.'
+              : 'C’était simple ? Vos clients trouveront ça simple aussi.'}
+          </p>
+          <p className="mt-0.5 text-sm opacity-70">
+            Fait avec Askly ·{' '}
+            {tutorial
+              ? 'décrivez les étapes, l’IA guide vos clients une par une.'
+              : 'décrivez ce que vous voulez savoir, l’IA écrit le questionnaire.'}{' '}
+            14 jours gratuits, sans carte bancaire.
+          </p>
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-4 pl-12 sm:pl-0">
         <a
           href="/"
           target="_blank"
           rel="noreferrer"
-          className="text-sm underline-offset-4 opacity-80 hover:underline hover:opacity-100"
+          className="text-sm whitespace-nowrap underline-offset-4 opacity-80 hover:underline hover:opacity-100"
         >
-          Voir comment ça marche
+          En savoir plus
         </a>
+        <Button asChild variant="secondary">
+          <a href="/signup" target="_blank" rel="noreferrer">
+            Essayer gratuitement <ArrowUpRight />
+          </a>
+        </Button>
       </div>
-      <p className="mt-3 text-xs opacity-60">14 jours gratuits, sans carte bancaire.</p>
     </aside>
   )
 }
