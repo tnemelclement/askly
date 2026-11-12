@@ -18,7 +18,7 @@ type Q = Omit<Question, 'required'> & { required?: boolean }
 type Section = { title: string; questions: Q[] }
 type Def = Omit<FormDefinition, 'sections'> & { sections: Section[] }
 
-const TYPES: Record<QuestionType, string> = {
+export const TYPES: Record<QuestionType, string> = {
   text: 'Texte court',
   longtext: 'Texte long',
   number: 'Nombre',

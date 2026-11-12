@@ -1,9 +1,9 @@
 import { Link } from '@tanstack/react-router'
 import { ClipboardList } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useAppTheme } from '@/lib/theme'
 
-/** Carte centrée des pages de connexion et d'inscription. */
+/** Pages de connexion et d'inscription, dans la DA du back-office (resend.com). */
 export function AuthShell({
   title,
   description,
@@ -13,22 +13,21 @@ export function AuthShell({
   description: string
   children: ReactNode
 }) {
+  useAppTheme()
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-secondary p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <Link
-            to="/"
-            className="mb-2 flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground"
-            aria-label="Askly, accueil"
-          >
-            <ClipboardList className="size-4" aria-hidden="true" />
-          </Link>
-          <CardTitle>{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
-        </CardHeader>
-        <CardContent>{children}</CardContent>
-      </Card>
+    <div className="flex min-h-dvh flex-col items-center justify-center bg-background px-4 py-10">
+      <div className="w-full max-w-sm">
+        <Link
+          to="/"
+          className="mb-8 flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground"
+          aria-label="Askly, accueil"
+        >
+          <ClipboardList className="size-5" aria-hidden="true" />
+        </Link>
+        <h1 className="text-[28px] leading-tight font-medium">{title}</h1>
+        <p className="mt-1 mb-8 text-sm text-muted-foreground">{description}</p>
+        {children}
+      </div>
     </div>
   )
 }

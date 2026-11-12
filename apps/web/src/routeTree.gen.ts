@@ -18,6 +18,7 @@ import { Route as SignupRouteImport } from './routes/signup'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminAccountRouteImport } from './routes/admin.account'
 import { Route as AdminEditRouteImport } from './routes/admin.edit'
+import { Route as AdminResponsesRouteImport } from './routes/admin.responses'
 import { Route as AdminLoginRouteImport } from './routes/admin_.login'
 import { Route as RTokenRouteImport } from './routes/r.$token'
 import { Route as AdminFormsFormIdRouteImport } from './routes/admin.forms.$formId'
@@ -68,6 +69,11 @@ const AdminEditRoute = AdminEditRouteImport.update({
   path: '/edit',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminResponsesRoute = AdminResponsesRouteImport.update({
+  id: '/responses',
+  path: '/responses',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminLoginRoute = AdminLoginRouteImport.update({
   id: '/admin_/login',
   path: '/admin/login',
@@ -99,6 +105,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/admin/account': typeof AdminAccountRoute
   '/admin/edit': typeof AdminEditRoute
+  '/admin/responses': typeof AdminResponsesRoute
   '/admin/login': typeof AdminLoginRoute
   '/r/$token': typeof RTokenRoute
   '/admin/': typeof AdminIndexRoute
@@ -113,6 +120,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/admin/account': typeof AdminAccountRoute
   '/admin/edit': typeof AdminEditRoute
+  '/admin/responses': typeof AdminResponsesRoute
   '/admin/login': typeof AdminLoginRoute
   '/r/$token': typeof RTokenRoute
   '/admin': typeof AdminIndexRoute
@@ -129,6 +137,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/admin/account': typeof AdminAccountRoute
   '/admin/edit': typeof AdminEditRoute
+  '/admin/responses': typeof AdminResponsesRoute
   '/admin_/login': typeof AdminLoginRoute
   '/r/$token': typeof RTokenRoute
   '/admin/': typeof AdminIndexRoute
@@ -146,6 +155,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/admin/account'
     | '/admin/edit'
+    | '/admin/responses'
     | '/admin/login'
     | '/r/$token'
     | '/admin/'
@@ -160,6 +170,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/admin/account'
     | '/admin/edit'
+    | '/admin/responses'
     | '/admin/login'
     | '/r/$token'
     | '/admin'
@@ -175,6 +186,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/admin/account'
     | '/admin/edit'
+    | '/admin/responses'
     | '/admin_/login'
     | '/r/$token'
     | '/admin/'
@@ -258,6 +270,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEditRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/responses': {
+      id: '/admin/responses'
+      path: '/responses'
+      fullPath: '/admin/responses'
+      preLoaderRoute: typeof AdminResponsesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin_/login': {
       id: '/admin_/login'
       path: '/admin/login'
@@ -292,6 +311,7 @@ declare module '@tanstack/react-router' {
 interface AdminRouteChildren {
   AdminAccountRoute: typeof AdminAccountRoute
   AdminEditRoute: typeof AdminEditRoute
+  AdminResponsesRoute: typeof AdminResponsesRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminFormsFormIdRoute: typeof AdminFormsFormIdRoute
   AdminRespondentsRespondentIdRoute: typeof AdminRespondentsRespondentIdRoute
@@ -300,6 +320,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAccountRoute: AdminAccountRoute,
   AdminEditRoute: AdminEditRoute,
+  AdminResponsesRoute: AdminResponsesRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminFormsFormIdRoute: AdminFormsFormIdRoute,
   AdminRespondentsRespondentIdRoute: AdminRespondentsRespondentIdRoute,

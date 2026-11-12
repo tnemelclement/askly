@@ -28,13 +28,16 @@ import {
 import {
   createRespondent,
   deleteForm,
+  deleteRespondent,
   exportAnswers,
   formOrThrow,
   getRespondentDetail,
   HttpError,
+  listAllRespondents,
   listFormSummaries,
   listRespondents,
   putForm,
+  reopenRespondent,
 } from './admin.ts'
 import { pendingQuestion, runTurn, visibleMessages } from './ai.ts'
 import {
@@ -622,6 +625,23 @@ export function buildApp({
       .object({ name: z.string().trim().min(1).max(200), email: optionalEmail })
       .parse(req.body)
     return createRespondent(db, account, formParams.parse(req.params).formId, body, origin(req))
+  })
+
+  app.get('/api/admin/respondents', async (req) => {
+    const account = await requireAccount(req)
+    return listAllRespondents(db, account.id, origin(req))
+  })
+
+  app.delete('/api/admin/respondents/:id', async (req) => {
+    const account = await requireAccount(req)
+    const { id } = z.object({ id: z.uuid() }).parse(req.params)
+    return deleteRespondent(db, storage, account.id, id)
+  })
+
+  app.post('/api/admin/respondents/:id/reopen', async (req) => {
+    const account = await requireAccount(req)
+    const { id } = z.object({ id: z.uuid() }).parse(req.params)
+    return reopenRespondent(db, account.id, id)
   })
 
   app.get('/api/admin/respondents/:id', async (req) => {

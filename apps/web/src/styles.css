@@ -2,12 +2,14 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
+@import "@fontsource-variable/inter";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: "Geist Variable", "Helvetica Neue", Arial, sans-serif;
+  --color-field: var(--field);
   --color-live: var(--live);
   --color-live-soft: var(--live-soft);
   --color-ok: var(--ok);
@@ -129,6 +131,69 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/*
+ * Back-office (classe `app` posée sur <html> par AppShell et les pages de connexion) :
+ * DA reprise de resend.com. Fond presque blanc, gris neutres, champs et boutons pleins
+ * en gris très léger, arrondis de 12 px, Inter. Posée sur <html> pour que les fenêtres
+ * (portails Radix) en héritent aussi.
+ */
+html.app {
+  --background: #fdfdfd;
+  --foreground: #191919;
+  --card: #fdfdfd;
+  --card-foreground: #191919;
+  --popover: #ffffff;
+  --popover-foreground: #191919;
+  --primary: #191919;
+  --primary-foreground: #ffffff;
+  --secondary: #f2f2f2;
+  --secondary-foreground: #191919;
+  --muted: #f2f2f2;
+  --muted-foreground: #6f6f6f;
+  --accent: #ececec;
+  --accent-foreground: #191919;
+  --border: #ebebeb;
+  --input: #dadada;
+  --field: #f3f3f3;
+  --ring: #b5b5b5;
+  --radius: 0.75rem;
+  --ok: #18794e;
+  --ok-soft: #e9f9ef;
+  --sidebar: #fdfdfd;
+  --sidebar-border: #ebebeb;
+  --sidebar-accent: #ececec;
+  --shadow-soft: none;
+}
+html.app.dark {
+  color-scheme: dark;
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --card: #0a0a0a;
+  --card-foreground: #ededed;
+  --popover: #141414;
+  --popover-foreground: #ededed;
+  --primary: #ededed;
+  --primary-foreground: #0a0a0a;
+  --secondary: #1a1a1a;
+  --secondary-foreground: #ededed;
+  --muted: #1a1a1a;
+  --muted-foreground: #a0a0a0;
+  --accent: #222222;
+  --accent-foreground: #ededed;
+  --destructive: #ff6166;
+  --border: #222222;
+  --input: #2e2e2e;
+  --field: #161616;
+  --ring: #555555;
+  --ok: #4cc38a;
+  --ok-soft: #10291c;
+  --live: #5b9bff;
+  --live-soft: #13233f;
+  --sidebar: #0a0a0a;
+  --sidebar-border: #222222;
+  --sidebar-accent: #1f1f1f;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -156,6 +221,39 @@
     @apply font-sans;
   }
 }
+@layer base {
+  html.app body {
+    font-family: "Inter Variable", "Helvetica Neue", Arial, sans-serif;
+    font-size: 14px;
+    font-feature-settings: "cv11", "ss01";
+  }
+  html.app h1,
+  html.app h2 {
+    letter-spacing: -0.025em;
+  }
+  /* Champs et boutons secondaires pleins, comme sur Resend. */
+  html.app [data-slot="input"],
+  html.app [data-slot="textarea"],
+  html.app select {
+    background-color: var(--field);
+    border-color: var(--input);
+    font-size: 14px;
+  }
+  html.app [data-slot="input"] {
+    height: 2.25rem;
+  }
+  html.app [data-slot="button"][data-variant="outline"] {
+    background-color: var(--field);
+    border-color: var(--input);
+  }
+  html.app [data-slot="button"][data-variant="outline"]:hover {
+    background-color: var(--accent);
+  }
+  html.app [data-slot="card"] {
+    box-shadow: none;
+  }
+}
+
 /* Coche qui se trace et halo d'une ligne qui vient d'être remplie (panneau « Vos réponses »). */
 @keyframes check-draw {
   from {

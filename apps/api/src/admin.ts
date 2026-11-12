@@ -50,16 +50,61 @@ export const linkFor = (origin: string, token: string) => `${origin}/r/${token}`
 export async function listFormSummaries(db: Db, accountId: string) {
   const rows = await db.select().from(respondents).where(eq(respondents.accountId, accountId))
   return (await listForms(db, accountId)).map((form) => {
-    const statuses = rows.filter((r) => r.formId === form.id).map(respondentStatus)
+    const own = rows.filter((r) => r.formId === form.id)
+    const statuses = own.map(respondentStatus)
     return {
       id: form.id,
       title: form.title,
       intro: form.intro,
+      kind: form.kind ?? 'questionnaire',
+      style: form.style ?? 'chat',
       reusable: form.reusable,
+      lastActivity: lastActivity(own),
       questionCount: allQuestions(form).length,
       respondents: statuses.length,
       done: statuses.filter((s) => s === 'done').length,
       inProgress: statuses.filter((s) => s === 'in_progress').length,
+    }
+  })
+}
+
+/** Date la plus récente parmi les créations, débuts et envois. */
+function lastActivity(
+  rows: { createdAt: Date; startedAt: Date | null; submittedAt: Date | null }[],
+): string | null {
+  const times = rows.flatMap((r) => [r.createdAt, r.startedAt, r.submittedAt]).filter(Boolean)
+  return times.length
+    ? new Date(Math.max(...times.map((t) => (t as Date).getTime()))).toISOString()
+    : null
+}
+
+/** Toutes les personnes invitées du compte, les plus récentes d'abord (journal de l'interface). */
+export async function listAllRespondents(db: Db, accountId: string, origin: string, limit = 500) {
+  const titles = new Map((await listForms(db, accountId)).map((f) => [f.id, f]))
+  const rows = await db
+    .select({ respondent: respondents, answered: count(answers.questionId) })
+    .from(respondents)
+    .leftJoin(answers, eq(answers.respondentId, respondents.id))
+    .where(eq(respondents.accountId, accountId))
+    .groupBy(respondents.id)
+    .orderBy(desc(respondents.createdAt))
+    .limit(limit)
+  return rows.map(({ respondent: r, answered }) => {
+    const form = titles.get(r.formId)
+    return {
+      id: r.id,
+      name: r.name,
+      email: r.email,
+      formId: r.formId,
+      formTitle: form?.title ?? r.formId,
+      kind: form?.kind ?? 'questionnaire',
+      total: form ? allQuestions(form).length : 0,
+      answered,
+      status: respondentStatus(r),
+      createdAt: r.createdAt,
+      startedAt: r.startedAt,
+      submittedAt: r.submittedAt,
+      link: linkFor(origin, r.token),
     }
   })
 }
