@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatAnswer, validateAnswer } from './domain.ts'
+import { allQuestions, formatAnswer, validateAnswer } from './domain.ts'
 import { parseForm, readFormFiles } from './forms.ts'
 
 const YAML = `
@@ -143,5 +143,32 @@ describe('fichiers et images', () => {
   ])('refuse : %s', (_, question) => {
     const source = `title: T\nintro: I\nsections:\n  - title: S\n    questions:\n      - ${question}\n`
     expect(() => parseForm('bad', source)).toThrow(/invalide/)
+  })
+})
+
+describe('tutoriels', () => {
+  const tuto = parseForm('tuto', {
+    title: 'Installer l’app',
+    intro: 'On y va pas à pas.',
+    kind: 'tutorial',
+    sections: [
+      {
+        title: 'Étapes',
+        questions: [{ id: 'telecharger', label: 'Téléchargez l’app', type: 'step' }],
+      },
+    ],
+  })
+
+  it('une étape ne vaut que true, affichée « Fait »', () => {
+    expect(validateAnswer(tuto, 'telecharger', true)).toMatchObject({ ok: true, value: true })
+    expect(validateAnswer(tuto, 'telecharger', false).ok).toBe(false)
+    expect(validateAnswer(tuto, 'telecharger', 'oui').ok).toBe(false)
+    const [step] = allQuestions(tuto)
+    expect(step && formatAnswer(step, true)).toBe('Fait')
+  })
+
+  it('le prompt guide au lieu d’interroger', async () => {
+    const { buildSystemPrompt } = await import('./ai.ts')
+    expect(buildSystemPrompt(tuto)).toContain('Vous guidez une personne')
   })
 })

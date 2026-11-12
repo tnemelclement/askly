@@ -35,8 +35,9 @@ import { usePrefersReducedMotion, useStaggeredReveal } from './motion'
  * pour être corrigée à la main ; « Envoyer mes réponses » verrouille le tout.
  */
 
-export function answersCounterLabel(ready: number, total: number): string {
-  return `${ready}/${total} réponse${ready > 1 ? 's' : ''}`
+export function answersCounterLabel(ready: number, total: number, tutorial = false): string {
+  const unit = tutorial ? 'étape' : 'réponse'
+  return `${ready}/${total} ${unit}${ready > 1 ? 's' : ''}`
 }
 
 export function AnswersPanel({
@@ -90,14 +91,18 @@ export function AnswersPanel({
   const total = allQuestions(form).length
   const ready = answeredIds.filter((id) => revealed.has(id)).length
   const missing = missingRequired(form, answers)
+  const tutorial = form.kind === 'tutorial'
 
   return (
-    <section aria-label="Vos réponses" className="flex h-full flex-col">
+    <section aria-label={tutorial ? 'Étapes' : 'Vos réponses'} className="flex h-full flex-col">
       <header className="border-b px-5 py-4">
-        <h2 className="text-sm font-semibold">Vos réponses</h2>
+        <h2 className="text-sm font-semibold">{tutorial ? 'Étapes' : 'Vos réponses'}</h2>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          {answersCounterLabel(ready, total)}
-          {!locked && ' · cliquez sur une ligne pour la corriger'}
+          {answersCounterLabel(ready, total, tutorial)}
+          {!locked &&
+            (tutorial
+              ? ' · cliquez sur une étape pour la cocher'
+              : ' · cliquez sur une ligne pour la corriger')}
         </p>
       </header>
 
@@ -118,7 +123,8 @@ export function AnswersPanel({
                     <button
                       type="button"
                       disabled={locked}
-                      onClick={() => setEditing(q)}
+                      // Une étape se coche d'un clic : rien à saisir.
+                      onClick={() => (q.type === 'step' ? void onEdit(q.id, true) : setEditing(q))}
                       data-status={state}
                       className={cn(
                         'group flex w-full items-start gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors',
@@ -160,7 +166,7 @@ export function AnswersPanel({
         {locked ? (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <Lock className="size-4" aria-hidden="true" />
-            Réponses envoyées. Merci !
+            {tutorial ? 'Tutoriel terminé. Merci !' : 'Réponses envoyées. Merci !'}
           </p>
         ) : (
           <>
@@ -171,12 +177,12 @@ export function AnswersPanel({
               onClick={onSubmit}
             >
               <Send />
-              Envoyer mes réponses
+              {tutorial ? 'Terminer' : 'Envoyer mes réponses'}
             </Button>
             {missing.length > 0 && (
               <p className="mt-2 text-center text-xs text-muted-foreground">
-                Encore {missing.length} question{missing.length > 1 ? 's' : ''} obligatoire
-                {missing.length > 1 ? 's' : ''}
+                Encore {missing.length} {tutorial ? 'étape' : 'question'}
+                {missing.length > 1 ? 's' : ''} obligatoire{missing.length > 1 ? 's' : ''}
               </p>
             )}
           </>

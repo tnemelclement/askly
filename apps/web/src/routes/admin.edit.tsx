@@ -141,7 +141,8 @@ function EditPage() {
           </CardTitle>
           <CardDescription>
             À qui s’adresse le questionnaire, à quoi serviront les réponses, ce que vous voulez
-            savoir. L’IA rédige les questions ; vous relisez avant d’enregistrer.
+            savoir. L’IA rédige les questions ; vous relisez avant d’enregistrer. Pour faire faire
+            quelque chose à un client, demandez un tutoriel : l’IA le guidera étape par étape.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3">
@@ -170,7 +171,7 @@ function EditPage() {
           <CardDescription>
             {visual
               ? 'Chaque question peut avoir une aide que l’IA utilise pour l’expliquer.'
-              : 'Format YAML. Types : text, longtext, number, date, yesno, choice, multichoice, file. Chaque question peut avoir une aide (help) que l’IA utilise pour expliquer. « style: classic » : formulaire classique, sans IA.'}
+              : 'Format YAML. Types : text, longtext, number, date, yesno, choice, multichoice, file, step (tutoriel). Chaque question peut avoir une aide (help) que l’IA utilise pour expliquer. « style: classic » : formulaire classique, sans IA. « kind: tutorial » : tutoriel guidé.'}
           </CardDescription>
           <CardAction>
             <div className="flex rounded-lg border p-0.5">

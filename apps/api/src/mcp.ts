@@ -45,6 +45,8 @@ Two kinds of questionnaires:
 
 Workflow to "make a questionnaire for X": write the definition, create_form, create_respondent, then give the user the link. Never send the link or any message to the respondent yourself: the user sends it (WhatsApp, email...).
 
+Tutorials (kind: "tutorial"): to get someone to do something without calling them. Each step is a question of type "step": label = the action in one sentence, help = where to click, what they should see, common pitfalls (the AI uses it when they are stuck), image = a screenshot. The AI gives one step at a time and marks it done when the person says so.
+
 Writing good questionnaires: 5 to 12 questions, one idea each, natural order. Prefer choice / multichoice / yesno when answers are predictable (respondents click instead of typing). Add 2 to 4 "suggestions" to open questions when typical answers exist. Add "help" to any question that might not be understood: the AI uses it to explain. Put in "context" who the respondent is and what the answers are for. Write the questionnaire in the respondent's language (French by default, formal "vous"), without jargon.
 
 Images: a question (or the whole form) can show an image, "image": { "url": "...", "alt": "..." }. Upload it first with upload_image (from a URL or base64) and use the returned url.
@@ -132,7 +134,7 @@ export function buildMcpServer(
     {
       title: 'Create a questionnaire',
       description:
-        'Create a new questionnaire. Fails if the id is already taken (use update_form to change an existing one). Question types: text, longtext, number, date (YYYY-MM-DD), yesno, choice (one option), multichoice (several), file (the respondent attaches photos/PDF/documents with a button; up to 10 files of 20 MB). Optional "image": { "url", "alt" } on a question or on the form (cover), url from upload_image. "options" (at least 2) is required for choice/multichoice and forbidden otherwise; "suggestions" (1 to 6 one-click answers) only on questions without options; "required" defaults to true; question ids: lowercase letters, digits and underscores, unique.',
+        'Create a new questionnaire. Fails if the id is already taken (use update_form to change an existing one). Question types: text, longtext, number, date (YYYY-MM-DD), yesno, choice (one option), multichoice (several), file (the respondent attaches photos/PDF/documents with a button; up to 10 files of 20 MB), step (tutorials only: something the person does; answered true when they say it is done). Set "kind": "tutorial" to guide someone through steps instead of asking questions. Optional "image": { "url", "alt" } on a question or on the form (cover), url from upload_image. "options" (at least 2) is required for choice/multichoice and forbidden otherwise; "suggestions" (1 to 6 one-click answers) only on questions without options; "required" defaults to true; question ids: lowercase letters, digits and underscores, unique.',
       inputSchema: {
         form_id: formId,
         reusable: z
@@ -332,7 +334,7 @@ export function buildMcpServer(
         value: z
           .union([z.string(), z.number(), z.boolean(), z.array(z.string()), z.null()])
           .describe(
-            'text/longtext/choice: string; number: number; date: "YYYY-MM-DD"; yesno: boolean; multichoice: string[]; null clears.',
+            'text/longtext/choice: string; number: number; date: "YYYY-MM-DD"; yesno: boolean; step: true; multichoice: string[]; null clears.',
           ),
       },
       annotations: { idempotentHint: true },

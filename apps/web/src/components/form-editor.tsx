@@ -27,6 +27,7 @@ const TYPES: Record<QuestionType, string> = {
   choice: 'Choix unique',
   multichoice: 'Choix multiples',
   file: 'Fichiers (photos, PDF…)',
+  step: 'Étape à réaliser (tutoriel)',
 }
 
 const SELECT =
@@ -84,6 +85,8 @@ export function FormEditor({
       const s = d.sections[si]
       if (s) fn(s)
     })
+  const tutorial = def.kind === 'tutorial'
+  const newType: QuestionType = tutorial ? 'step' : 'text'
   const allIds = def.sections.flatMap((s) => s.questions.map((q) => q.id))
   const freshId = () => {
     let n = allIds.length + 1
@@ -130,6 +133,21 @@ export function FormEditor({
               })
             }
           />
+        </Field>
+        <Field label="Type">
+          <select
+            className={`${SELECT} sm:max-w-md`}
+            value={def.kind ?? 'questionnaire'}
+            onChange={(e) =>
+              update((d) => {
+                if (e.target.value === 'tutorial') d.kind = 'tutorial'
+                else delete d.kind
+              })
+            }
+          >
+            <option value="questionnaire">Questionnaire : des questions à poser</option>
+            <option value="tutorial">Tutoriel : guider la personne étape par étape</option>
+          </select>
         </Field>
         <Field label="Présentation">
           <select
@@ -183,7 +201,7 @@ export function FormEditor({
               // biome-ignore lint/suspicious/noArrayIndexKey: l'id se modifie en cours de saisie.
               <div key={qi} className="grid gap-3 rounded-lg border bg-background p-4">
                 <div className="flex items-start gap-2">
-                  <Field label={`Question ${qi + 1}`} className="flex-1">
+                  <Field label={`${tutorial ? 'Étape' : 'Question'} ${qi + 1}`} className="flex-1">
                     <Input
                       value={q.label ?? ''}
                       onChange={(e) =>
@@ -244,7 +262,7 @@ export function FormEditor({
                             q.options ??= ['', '']
                             delete q.suggestions
                           } else delete q.options
-                          if (q.type === 'file') delete q.suggestions
+                          if (q.type === 'file' || q.type === 'step') delete q.suggestions
                         })
                       }
                     >
@@ -294,7 +312,7 @@ export function FormEditor({
                     }
                   />
                 )}
-                {!hasOptions(q.type) && q.type !== 'file' && (
+                {!hasOptions(q.type) && q.type !== 'file' && q.type !== 'step' && (
                   <ListField
                     label="Réponses suggérées en un clic (facultatif, une par ligne)"
                     value={q.suggestions ?? []}
@@ -328,11 +346,11 @@ export function FormEditor({
             onClick={() =>
               inSection(
                 si,
-                (s) => void s.questions.push({ id: freshId(), label: '', type: 'text' }),
+                (s) => void s.questions.push({ id: freshId(), label: '', type: newType }),
               )
             }
           >
-            <Plus /> Ajouter une question
+            <Plus /> {tutorial ? 'Ajouter une étape' : 'Ajouter une question'}
           </Button>
         </section>
       ))}
@@ -345,7 +363,7 @@ export function FormEditor({
             (d) =>
               void d.sections.push({
                 title: 'Nouvelle section',
-                questions: [{ id: freshId(), label: '', type: 'text' }],
+                questions: [{ id: freshId(), label: '', type: newType }],
               }),
           )
         }

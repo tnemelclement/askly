@@ -43,6 +43,7 @@ const TYPE_HINTS: Record<Question['type'], string> = {
   number: 'nombre JSON (ex. 1500), sans unité',
   date: 'chaîne AAAA-MM-JJ',
   yesno: 'booléen JSON true ou false',
+  step: 'étape à réaliser par la personne : booléen JSON true, seulement quand elle dit l’avoir faite',
   file: `fichier(s) que le répondant joint lui-même avec le bouton « Joindre un fichier » sous la question (photos, PDF, documents) ; ne jamais utiliser ${RECORD_ANSWER_TOOL} pour ce type`,
 }
 
@@ -64,6 +65,7 @@ export function buildSystemPrompt(form: Form): string {
   const sections = form.sections
     .map((s) => `## ${s.title}\n${s.questions.map(describeQuestion).join('\n')}`)
     .join('\n\n')
+  if (form.kind === 'tutorial') return tutorialPrompt(form, sections)
   return `Vous aidez une personne à remplir le questionnaire « ${form.title} » sous forme de conversation.
 
 Présentation donnée au répondant : ${form.intro.trim()}
@@ -86,6 +88,30 @@ Règles :
 - Quand toutes les questions obligatoires sont remplies, faites un court récapitulatif et invitez la personne à vérifier le panneau « Vos réponses » (elle peut y corriger chaque ligne) puis à cliquer sur « Envoyer mes réponses ».
 
 Questions :
+
+${sections}`
+}
+
+/** Tutoriel : on guide la personne pour qu'elle fasse elle-même chaque étape. */
+function tutorialPrompt(form: Form, sections: string): string {
+  return `Vous guidez une personne, pas à pas, pour qu'elle réalise elle-même « ${form.title} ».
+
+Présentation donnée à la personne : ${form.intro.trim()}
+${form.context ? `\nContexte (pour vous, ne pas le réciter) : ${form.context.trim()}\n` : ''}
+Règles :
+- Vouvoyez, en français, sur un ton chaleureux, patient et concret. Messages courts.
+- Donnez UNE étape à la fois, dans l'ordre, en sautant celles déjà faites (voir l'état fourni avec chaque message) : ce qu'il faut faire, où cliquer, ce qu'on doit voir ensuite. Des tirets simples pour les sous-étapes.
+- À la fin de CHAQUE message qui donne (ou redonne) une étape, appelez l'outil ${PRESENT_QUESTION_TOOL} avec l'id de l'étape : il affiche « C'est fait » et « Je bloque » sous votre message.
+- Quand la personne dit avoir fait l'étape, enregistrez-la avec ${RECORD_ANSWER_TOOL} (valeur true), puis donnez la suivante. Vous croyez la personne sur parole.
+- Si elle bloque, ne trouve pas un bouton ou voit autre chose que prévu : posez une question simple pour comprendre où elle en est, puis réexpliquez autrement, en vous appuyant sur l'« aide » de l'étape. Ne passez pas à la suite tant qu'elle n'a pas réussi, sauf étape facultative.
+- Une étape de type autre que « step » est une information à demander : posez-la et enregistrez la réponse comme dans un questionnaire.
+- Pour une étape de type fichier, invitez la personne à utiliser le bouton « Joindre un fichier ».
+- N'inventez jamais une manipulation absente du tutoriel ; si vous ne savez pas, dites-le et proposez de continuer ou de prévenir la personne qui a envoyé le lien.
+- Chaque message que vous écrivez contient du texte : ne vous contentez jamais d'appeler les outils.
+- Restez sur le sujet du tutoriel ; déclinez poliment le reste. Pas de Markdown (ni gras, ni titres).
+- Quand toutes les étapes obligatoires sont faites, félicitez la personne en une phrase et invitez-la à cliquer sur « Terminer ».
+
+Étapes :
 
 ${sections}`
 }
@@ -153,7 +179,7 @@ export function buildPresentQuestionTool(form: Form): Anthropic.Tool {
  * l'interface affiche leurs options.
  */
 export function mergeSuggestions(q: Question, fromAi: unknown): string[] {
-  if (q.options || q.type === 'yesno') return []
+  if (q.options || q.type === 'yesno' || q.type === 'step') return []
   const ai = Array.isArray(fromAi)
     ? fromAi.filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
     : []
@@ -223,6 +249,8 @@ export async function applyToolCall(
   }
 }
 
+const KICKOFF_TUTORIAL =
+  "(La personne vient d'ouvrir le tutoriel. Accueillez-la en une phrase, dites-lui qu'elle peut vous dire à tout moment si elle bloque, puis donnez la première étape.)"
 const KICKOFF =
   "(Le répondant vient d'ouvrir le questionnaire. Accueillez-le en une phrase, rappelez qu'il peut demander des précisions à tout moment, puis posez la première question.)"
 
@@ -253,7 +281,7 @@ export async function runTurn(opts: {
       content: [
         {
           type: 'text',
-          text: `${state}\n\n${message ? `Message du répondant : ${message}` : KICKOFF}`,
+          text: `${state}\n\n${message ? `Message du répondant : ${message}` : form.kind === 'tutorial' ? KICKOFF_TUTORIAL : KICKOFF}`,
         },
       ],
       display: message,

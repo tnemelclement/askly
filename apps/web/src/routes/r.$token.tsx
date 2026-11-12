@@ -72,7 +72,7 @@ function RespondentPage() {
     )
   }
   const { form, respondent } = query.data
-  if (respondent.submittedAt || submitted) return <Submitted demo={form.id.startsWith('demo-')} />
+  if (respondent.submittedAt || submitted) return <Submitted form={form} />
   return form.style === 'classic' ? (
     <ClassicForm
       token={token}
@@ -86,12 +86,17 @@ function RespondentPage() {
 }
 
 /** Écran final, dans la même fenêtre que le questionnaire (voir ChatLayout). */
-function Submitted({ demo }: { demo: boolean }) {
+function Submitted({ form }: { form: Form }) {
+  const demo = form.id.startsWith('demo-')
   return (
     <div className="h-dvh bg-muted sm:p-6">
       <div className="mx-auto flex h-full max-w-6xl flex-col items-center justify-center gap-4 overflow-hidden bg-background p-6 text-center sm:rounded-xl sm:border sm:shadow-lg">
         <CircleCheck className="size-16 text-primary" aria-hidden />
-        <p className="text-lg font-medium">Vos réponses ont été envoyées. Merci !</p>
+        <p className="text-lg font-medium">
+          {form.kind === 'tutorial'
+            ? 'Bravo, c’est terminé. Merci !'
+            : 'Vos réponses ont été envoyées. Merci !'}
+        </p>
         {/* Démo de la page d'accueil : on propose la suite. */}
         {demo && (
           <>
@@ -267,7 +272,7 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
     }
   }
 
-  if (locked) return <Submitted demo={form.id.startsWith('demo-')} />
+  if (locked) return <Submitted form={form} />
 
   const answeredCount = Object.keys(answers).length
   const total = allQuestions(form).length
@@ -277,7 +282,7 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
     <ChatLayout
       title={form.title}
       scrollRef={scrollRef}
-      panelSummary={answersCounterLabel(answeredCount, total)}
+      panelSummary={answersCounterLabel(answeredCount, total, form.kind === 'tutorial')}
       panel={
         <AnswersPanel
           form={form}

@@ -14,6 +14,8 @@ export const QUESTION_TYPES = [
   'date',
   'yesno',
   'file',
+  /** Tutoriel : une étape que la personne réalise ; réponse `true` quand elle dit l'avoir faite. */
+  'step',
 ] as const
 
 /** Fichiers joints au plus par question `file`, et taille maximale de chacun. */
@@ -43,8 +45,8 @@ const questionSchema = z
   .refine((q) => (q.type === 'choice' || q.type === 'multichoice') === Boolean(q.options), {
     message: '`options` est requis pour choice/multichoice, et interdit pour les autres types',
   })
-  .refine((q) => !(q.suggestions && (q.options || q.type === 'file')), {
-    message: '`suggestions` est réservé aux questions sans `options` (ni `file`)',
+  .refine((q) => !(q.suggestions && (q.options || q.type === 'file' || q.type === 'step')), {
+    message: '`suggestions` est réservé aux questions sans `options` (ni `file`, ni `step`)',
   })
 
 /** Identifiant d'un questionnaire : il apparaît dans les URL de l'admin. */
@@ -55,6 +57,13 @@ export const formSchema = z
     title: z.string().min(1),
     intro: z.string().min(1),
     context: z.string().optional(),
+    /** Questionnaire (défaut) ou tutoriel : l'IA guide la personne étape par étape (questions `step`). */
+    kind: z
+      .enum(['questionnaire', 'tutorial'])
+      .optional()
+      .describe(
+        'tutorial: guide the person through steps to do (questions of type "step": label = what to do, help = details and common pitfalls); questionnaire (default): ask questions.',
+      ),
     /** Présentation : conversation avec l'IA (défaut) ou formulaire classique, une question par écran. */
     style: z
       .enum(['chat', 'classic'])
@@ -130,6 +139,8 @@ function validateValue(q: Question, raw: unknown): Result {
         ? { ok: true, value: raw }
         : fail('date inexistante')
     }
+    case 'step':
+      return raw === true ? { ok: true, value: true } : fail('true attendu (étape faite)')
     case 'yesno':
       return typeof raw === 'boolean' ? { ok: true, value: raw } : fail('true ou false attendu')
     case 'choice':
@@ -188,6 +199,7 @@ export function formatAnswer(
     return value.map((id) => fileNames[id] ?? 'fichier').join(', ')
   }
   if (q.type === 'yesno') return value ? 'Oui' : 'Non'
+  if (q.type === 'step') return 'Fait'
   if (q.type === 'date' && typeof value === 'string') {
     return new Date(`${value}T00:00:00Z`).toLocaleDateString('fr-FR', { timeZone: 'UTC' })
   }

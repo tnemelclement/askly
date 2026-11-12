@@ -79,7 +79,13 @@ export function QuickReplies({
   }
 
   const choices =
-    question.type === 'yesno' ? ['Oui', 'Non'] : question.options ? question.options : suggestions
+    question.type === 'yesno'
+      ? ['Oui', 'Non']
+      : question.type === 'step'
+        ? ['C’est fait', 'Je bloque']
+        : question.options
+          ? question.options
+          : suggestions
   if (choices.length === 0) return null
 
   return (

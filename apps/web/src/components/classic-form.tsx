@@ -21,12 +21,15 @@ type Saved = { answers: Answers; files: Record<string, FileInfo> }
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
-const choicesOf = (q: Question) => (q.type === 'yesno' ? ['Oui', 'Non'] : (q.options ?? []))
+const DONE = 'C’est fait'
+const choicesOf = (q: Question) =>
+  q.type === 'yesno' ? ['Oui', 'Non'] : q.type === 'step' ? [DONE] : (q.options ?? [])
 
 /** Brouillon : texte pour les champs, liste pour les choix multiples, valeur brute sinon. */
 function draftFor(q: Question, v: AnswerValue | undefined): AnswerValue | undefined {
   if (q.type === 'multichoice') return Array.isArray(v) ? v : []
   if (q.type === 'yesno') return v === undefined ? undefined : v ? 'Oui' : 'Non'
+  if (q.type === 'step') return v === undefined ? undefined : DONE
   return v === undefined ? '' : typeof v === 'number' ? String(v) : v
 }
 
@@ -78,7 +81,9 @@ export function ClassicForm({
     setBusy(true)
     setError(null)
     try {
-      const body = { value: q.type === 'yesno' ? value === 'Oui' : value }
+      const body = {
+        value: q.type === 'yesno' ? value === 'Oui' : q.type === 'step' ? true : value,
+      }
       const res = await api<Saved>(`/api/r/${token}/answers/${q.id}`, { method: 'PUT', body })
       setAnswers(res.answers)
       setFiles(res.files)
@@ -125,7 +130,7 @@ export function ClassicForm({
 
   // Clavier : A, B, C… choisissent une option, comme sur Typeform.
   useEffect(() => {
-    if (!item || !['choice', 'yesno', 'multichoice'].includes(item.q.type)) return
+    if (!item || !['choice', 'yesno', 'multichoice', 'step'].includes(item.q.type)) return
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || busy) return
       // Entrée hors d'un champ ou d'un bouton : valide les choix (sinon le formulaire s'en charge).
@@ -253,7 +258,9 @@ export function ClassicForm({
             ) : (
               <div className="grid gap-6">
                 <h2 className="text-3xl font-semibold tracking-tight">
-                  {missing.length ? 'Il manque quelques réponses' : 'C’est terminé !'}
+                  {missing.length
+                    ? `Il manque quelques ${form.kind === 'tutorial' ? 'étapes' : 'réponses'}`
+                    : 'C’est terminé !'}
                 </h2>
                 {missing.length ? (
                   <ul className="grid gap-2">
@@ -285,7 +292,7 @@ export function ClassicForm({
                   disabled={busy || missing.length > 0}
                   onClick={() => void submit()}
                 >
-                  Envoyer mes réponses
+                  {form.kind === 'tutorial' ? 'Terminer' : 'Envoyer mes réponses'}
                 </Button>
               </div>
             )}
@@ -331,7 +338,7 @@ function Field({
   const text = typeof draft === 'string' ? draft : ''
   const autoFocus = hasFinePointer()
 
-  if (q.type === 'choice' || q.type === 'yesno' || q.type === 'multichoice') {
+  if (q.type === 'choice' || q.type === 'yesno' || q.type === 'multichoice' || q.type === 'step') {
     const selected = (o: string) => (Array.isArray(draft) ? draft.includes(o) : draft === o)
     return (
       <div className="grid gap-2 sm:max-w-md">
