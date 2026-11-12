@@ -5,6 +5,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { ArrowUp, CircleCheck } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { ClassicForm } from '@/components/classic-form'
 import { AnswersPanel, answersCounterLabel } from '@/components/conversation/answers-panel'
 import { ChatLayout } from '@/components/conversation/chat-layout'
 import {
@@ -58,6 +59,7 @@ function RespondentPage() {
     queryKey: ['respondent', token],
     queryFn: () => api<RespondentData>(`/api/r/${token}`),
   })
+  const [submitted, setSubmitted] = useState(false)
 
   if (query.isPending) {
     return <div className="flex h-dvh items-center justify-center text-muted-foreground">…</div>
@@ -69,7 +71,47 @@ function RespondentPage() {
       </div>
     )
   }
-  return <Conversation token={token} initial={query.data} />
+  const { form, respondent } = query.data
+  if (respondent.submittedAt || submitted) return <Submitted demo={form.id.startsWith('demo-')} />
+  return form.style === 'classic' ? (
+    <ClassicForm
+      token={token}
+      form={form}
+      initial={query.data}
+      onSubmitted={() => setSubmitted(true)}
+    />
+  ) : (
+    <Conversation token={token} initial={query.data} />
+  )
+}
+
+/** Écran final, dans la même fenêtre que le questionnaire (voir ChatLayout). */
+function Submitted({ demo }: { demo: boolean }) {
+  return (
+    <div className="h-dvh bg-muted sm:p-6">
+      <div className="mx-auto flex h-full max-w-6xl flex-col items-center justify-center gap-4 overflow-hidden bg-background p-6 text-center sm:rounded-xl sm:border sm:shadow-lg">
+        <CircleCheck className="size-16 text-primary" aria-hidden />
+        <p className="text-lg font-medium">Vos réponses ont été envoyées. Merci !</p>
+        {/* Démo de la page d'accueil : on propose la suite. */}
+        {demo && (
+          <>
+            <p className="max-w-md text-muted-foreground">
+              C'est ce que vivront vos clients. Créez vos propres questionnaires en décrivant ce que
+              vous voulez savoir.
+            </p>
+            <div className="flex flex-wrap justify-center gap-3">
+              <Button asChild size="lg">
+                <a href="/signup">Essai gratuit de 14 jours</a>
+              </Button>
+              <Button asChild size="lg" variant="outline">
+                <a href="/#demo">Retour à la démo</a>
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function Conversation({ token, initial }: { token: string; initial: RespondentData }) {
@@ -225,34 +267,7 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
     }
   }
 
-  if (locked) {
-    return (
-      // Même fenêtre que le chat (voir ChatLayout).
-      <div className="h-dvh bg-muted sm:p-6">
-        <div className="mx-auto flex h-full max-w-6xl flex-col items-center justify-center gap-4 overflow-hidden bg-background p-6 text-center sm:rounded-xl sm:border sm:shadow-lg">
-          <CircleCheck className="size-16 text-primary" aria-hidden />
-          <p className="text-lg font-medium">Vos réponses ont été envoyées. Merci !</p>
-          {/* Démo de la page d'accueil : on propose la suite. */}
-          {form.id.startsWith('demo-') && (
-            <>
-              <p className="max-w-md text-muted-foreground">
-                C'est ce que vivront vos clients. Créez vos propres questionnaires en décrivant ce
-                que vous voulez savoir.
-              </p>
-              <div className="flex flex-wrap justify-center gap-3">
-                <Button asChild size="lg">
-                  <a href="/signup">Essai gratuit de 14 jours</a>
-                </Button>
-                <Button asChild size="lg" variant="outline">
-                  <a href="/#demo">Retour à la démo</a>
-                </Button>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    )
-  }
+  if (locked) return <Submitted demo={form.id.startsWith('demo-')} />
 
   const answeredCount = Object.keys(answers).length
   const total = allQuestions(form).length

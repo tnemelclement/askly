@@ -170,7 +170,7 @@ function EditPage() {
           <CardDescription>
             {visual
               ? 'Chaque question peut avoir une aide que l’IA utilise pour l’expliquer.'
-              : 'Format YAML. Types : text, longtext, number, date, yesno, choice, multichoice, file. Chaque question peut avoir une aide (help) que l’IA utilise pour expliquer.'}
+              : 'Format YAML. Types : text, longtext, number, date, yesno, choice, multichoice, file. Chaque question peut avoir une aide (help) que l’IA utilise pour expliquer. « style: classic » : formulaire classique, sans IA.'}
           </CardDescription>
           <CardAction>
             <div className="flex rounded-lg border p-0.5">

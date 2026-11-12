@@ -131,6 +131,21 @@ export function FormEditor({
             }
           />
         </Field>
+        <Field label="Présentation">
+          <select
+            className={`${SELECT} sm:max-w-md`}
+            value={def.style ?? 'chat'}
+            onChange={(e) =>
+              update((d) => {
+                if (e.target.value === 'classic') d.style = 'classic'
+                else delete d.style
+              })
+            }
+          >
+            <option value="chat">Conversation avec l’IA</option>
+            <option value="classic">Formulaire classique, une question par écran (sans IA)</option>
+          </select>
+        </Field>
       </div>
 
       {def.sections.map((section, si) => (

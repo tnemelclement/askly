@@ -55,6 +55,13 @@ export const formSchema = z
     title: z.string().min(1),
     intro: z.string().min(1),
     context: z.string().optional(),
+    /** Présentation : conversation avec l'IA (défaut) ou formulaire classique, une question par écran. */
+    style: z
+      .enum(['chat', 'classic'])
+      .optional()
+      .describe(
+        'chat (default): the AI asks the questions; classic: one question per screen, no AI.',
+      ),
     /** Image de couverture, au-dessus de l'introduction. */
     image: imageSchema.optional(),
     sections: z

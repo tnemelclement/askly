@@ -72,6 +72,7 @@ import {
   findRespondentByToken,
   loadAnswers,
   loadMessages,
+  markStarted,
   markSubmitted,
   type Respondent,
   saveAnswer,
@@ -215,6 +216,24 @@ export function buildApp({
     }
   }
 
+  // Quota du compte : compté quand une personne commence ; celles déjà lancées continuent.
+  async function assertCanStart(respondent: Respondent) {
+    if (respondent.startedAt) return
+    const account = await getAccount(db, respondent.accountId)
+    if (!account || !(await canStartResponse(db, account))) {
+      throw new HttpError(
+        402,
+        'Ce questionnaire n’accepte plus de nouvelles réponses pour le moment. Prévenez la personne qui vous l’a envoyé.',
+      )
+    }
+  }
+
+  /** Mode classique : la première réponse saisie compte comme le début, comme le premier message du chat. */
+  async function startResponse(respondent: Respondent) {
+    await assertCanStart(respondent)
+    if (!respondent.startedAt) await markStarted(db, respondent.id)
+  }
+
   const tokenParams = z.object({ token: z.string().min(1).max(100) })
 
   // ─── Répondant ─────────────────────────────────────────────────────────────
@@ -247,16 +266,7 @@ export function buildApp({
     ) {
       throw new HttpError(429, 'Trop de messages pour ce questionnaire')
     }
-    // Quota du compte : compté quand une personne commence ; celles déjà lancées continuent.
-    if (!respondent.startedAt) {
-      const account = await getAccount(db, respondent.accountId)
-      if (!account || !(await canStartResponse(db, account))) {
-        throw new HttpError(
-          402,
-          'Ce questionnaire n’accepte plus de nouvelles réponses pour le moment. Prévenez la personne qui vous l’a envoyé.',
-        )
-      }
-    }
+    await assertCanStart(respondent)
     if (busy.has(respondent.id)) throw new HttpError(409, 'Une réponse est déjà en cours')
     busy.add(respondent.id)
 
@@ -293,6 +303,7 @@ export function buildApp({
     const { respondent, form } = await respondentOrThrow(token)
     if (respondent.submittedAt) throw new HttpError(409, 'Réponses déjà envoyées')
     const { value } = z.object({ value: z.unknown() }).parse(req.body)
+    await startResponse(respondent)
     const question = allQuestions(form).find((q) => q.id === questionId)
     if (question?.type === 'file') {
       // On ne peut que retirer des fichiers ici (liste vide : tout retirer) ; on en ajoute par l'envoi.
@@ -324,6 +335,7 @@ export function buildApp({
       .parse(req.params)
     const { respondent, form } = await respondentOrThrow(token)
     if (respondent.submittedAt) throw new HttpError(409, 'Réponses déjà envoyées')
+    await startResponse(respondent)
     const file = await readUpload(req)
     const added = await addRespondentFile(db, storage, form, respondent, questionId, file)
     return {
