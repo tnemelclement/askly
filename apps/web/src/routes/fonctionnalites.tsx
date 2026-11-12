@@ -124,7 +124,7 @@ function FeaturesPage() {
             nominative.
           </FeatureCard>
           <FeatureCard icon={Code} title="Sur votre site">
-            Une bulle « Donner mon avis » ou un formulaire dans la page, avec deux lignes de code.{' '}
+            Le questionnaire directement dans vos pages, avec une ligne de code (une iframe).{' '}
             <Link
               to="/integration"
               className="font-medium text-foreground underline-offset-4 hover:underline"

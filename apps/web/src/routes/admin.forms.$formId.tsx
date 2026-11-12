@@ -560,7 +560,7 @@ function InviteDialog({
   )
 }
 
-/** Lien public et code à coller dans un site : une bulle « Donner mon avis », ou dans la page. */
+/** Lien public et iframe à coller dans un site. */
 function EmbedDialog({
   form,
   publicToken,
@@ -573,7 +573,6 @@ function EmbedDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const queryClient = useQueryClient()
-  const [mode, setMode] = useState<'bubble' | 'inline'>('bubble')
   const toggle = useMutation({
     mutationFn: (enabled: boolean) =>
       api(`/api/admin/forms/${form.id}/public`, { body: { enabled } }),
@@ -582,12 +581,10 @@ function EmbedDialog({
   })
   const origin = window.location.origin
   const link = publicToken && `${origin}/f/${publicToken}`
-  const label = form.kind === 'tutorial' ? 'Être guidé' : 'Donner mon avis'
+  // Micro autorisé : la dictée fonctionne aussi dans l'iframe.
   const snippet =
-    publicToken &&
-    (mode === 'bubble'
-      ? `<script src="${origin}/embed.js" data-askly="${publicToken}" data-label="${label}" async></script>`
-      : `<script src="${origin}/embed.js" data-askly="${publicToken}" data-mode="inline" data-height="640px" async></script>`)
+    link &&
+    `<iframe src="${link}" title="${form.title.replaceAll('"', '&quot;')}" width="100%" height="640" style="border:0;border-radius:12px" allow="microphone"></iframe>`
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -618,25 +615,13 @@ function EmbedDialog({
               </div>
             </div>
             <div className="grid gap-2">
-              <div className="flex items-center justify-between gap-2">
-                <Label>Code à coller dans votre site</Label>
-                <PillTabs
-                  value={mode}
-                  onChange={setMode}
-                  items={[
-                    { value: 'bubble', label: 'Bulle' },
-                    { value: 'inline', label: 'Dans la page' },
-                  ]}
-                />
-              </div>
+              <Label>Code à coller dans votre site</Label>
               <pre className="overflow-x-auto rounded-lg border bg-muted p-3 font-mono text-xs whitespace-pre-wrap break-all">
                 {snippet}
               </pre>
               <p className="text-xs text-muted-foreground">
-                {mode === 'bubble'
-                  ? 'Avant la fin de </body> : un bouton en bas à droite ouvre le questionnaire. data-label change son texte, data-color sa couleur.'
-                  : 'À l’endroit où le questionnaire doit apparaître. data-height règle sa hauteur.'}{' '}
-                Une réponse n’est comptée que si le visiteur commence.
+                À l’endroit où le questionnaire doit apparaître ; height règle sa hauteur. Une
+                réponse n’est comptée que si le visiteur commence.
               </p>
             </div>
             <DialogFooter className="sm:justify-between">

@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import {
   CalendarCheck,
+  ClipboardList,
   Inbox,
   MessageCircle,
   QrCode,
@@ -8,7 +9,6 @@ import {
   ThumbsUp,
   UserPlus,
   Wrench,
-  X,
 } from 'lucide-react'
 import { type Line, ScriptedChat } from '@/components/landing-demo'
 import { BrowserFrame, CtaBand, FeatureCard, PageHero, SitePage } from '@/components/site'
@@ -26,11 +26,9 @@ const SCRIPT: Line[] = [
   { user: 'Oui, avec mon prénom' },
 ]
 
-const BUBBLE = `<script src="https://ask.tnemelc.fr/embed.js"
-  data-askly="VOTRE-JETON" data-label="Donner mon avis" async></script>`
-
-const INLINE = `<script src="https://ask.tnemelc.fr/embed.js"
-  data-askly="VOTRE-JETON" data-mode="inline" async></script>`
+const IFRAME = `<iframe src="https://ask.tnemelc.fr/f/VOTRE-LIEN"
+  title="Votre avis" width="100%" height="640"
+  style="border:0;border-radius:12px" allow="microphone"></iframe>`
 
 function IntegrationPage() {
   return (
@@ -40,9 +38,9 @@ function IntegrationPage() {
         title="Les avis et demandes de vos visiteurs, en conversation."
         aside={<SiteMock />}
       >
-        Une bulle « Donner mon avis » en bas de votre site, ou un formulaire directement dans la
-        page. Chaque visiteur répond en quelques clics ; vous recevez des réponses complètes, pas un
-        « bien » dans un champ de texte.
+        Le questionnaire s’affiche directement dans votre page, comme une vidéo YouTube : une ligne
+        à coller. Chaque visiteur répond en quelques clics ; vous recevez des réponses complètes,
+        pas un « bien » dans un champ de texte.
       </PageHero>
 
       <section className="border-y bg-muted/50">
@@ -76,22 +74,40 @@ function IntegrationPage() {
       </section>
 
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-          Deux lignes à coller, deux façons de l’afficher
-        </h2>
-        <p className="mt-2 max-w-2xl text-muted-foreground">
-          Dans Askly, ouvrez le questionnaire et cliquez sur « Intégrer » : le code est prêt. Il
-          fonctionne sur tout site qui accepte un bout de HTML (WordPress, Webflow, Shopify…).
-        </p>
-        <div className="mt-8 grid gap-6 lg:grid-cols-2">
-          <CodeCard title="La bulle" code={BUBBLE}>
-            Un bouton en bas à droite de toutes vos pages. Le questionnaire s’ouvre dans un panneau,
-            et ne se charge qu’au clic : votre site reste aussi rapide.
-          </CodeCard>
-          <CodeCard title="Dans la page" code={INLINE}>
-            Le questionnaire s’affiche à l’endroit du code : page « Contact », page de remerciement
-            après une commande, article de blog…
-          </CodeCard>
+        <div className="grid items-start gap-10 lg:grid-cols-2">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              Une ligne à coller
+            </h2>
+            <p className="mt-3 text-muted-foreground">
+              Dans Askly, ouvrez le questionnaire et cliquez sur « Intégrer » : le code est prêt.
+              C’est une iframe classique, elle fonctionne sur tout site qui accepte un bout de HTML
+              (WordPress, Wix, Webflow, Shopify…).
+            </p>
+            <ul className="mt-6 grid gap-3 text-sm">
+              <li>
+                <span className="font-medium">Où vous voulez :</span>{' '}
+                <span className="text-muted-foreground">
+                  page « Contact », page de remerciement après une commande, article de blog…
+                </span>
+              </li>
+              <li>
+                <span className="font-medium">À la taille voulue :</span>{' '}
+                <span className="text-muted-foreground">
+                  la largeur suit la page, la hauteur se règle avec height.
+                </span>
+              </li>
+              <li>
+                <span className="font-medium">Sans cadre en trop :</span>{' '}
+                <span className="text-muted-foreground">
+                  dans une iframe, Askly retire son propre cadre et se fond dans votre page.
+                </span>
+              </li>
+            </ul>
+          </div>
+          <pre className="overflow-x-auto rounded-xl bg-primary p-5 font-mono text-xs leading-relaxed text-primary-foreground">
+            {IFRAME}
+          </pre>
         </div>
       </section>
 
@@ -104,8 +120,8 @@ function IntegrationPage() {
               d’où elle vient. Si elle revient, elle reprend où elle en était.
             </FeatureCard>
             <FeatureCard icon={Star} title="Compté seulement s’il répond">
-              Afficher la bulle ou la page ne coûte rien : une réponse n’est comptée que si le
-              visiteur commence.
+              Afficher la page ne coûte rien : une réponse n’est comptée que si le visiteur
+              commence.
             </FeatureCard>
             <FeatureCard icon={QrCode} title="Aussi en lien direct">
               Le même lien public se met dans une signature de mail, un QR code en boutique ou une
@@ -115,49 +131,37 @@ function IntegrationPage() {
         </div>
       </section>
 
-      <CtaBand title="Ajoutez une bulle « Donner mon avis » à votre site aujourd’hui." />
+      <CtaBand title="Ajoutez une demande d’avis à votre site aujourd’hui." />
     </SitePage>
   )
 }
 
-function CodeCard({ title, code, children }: { title: string; code: string; children: string }) {
-  return (
-    <div className="flex flex-col rounded-xl border p-6">
-      <h3 className="font-semibold">{title}</h3>
-      <p className="mt-2 flex-1 text-sm text-muted-foreground">{children}</p>
-      <pre className="mt-5 overflow-x-auto rounded-lg bg-primary p-4 font-mono text-xs leading-relaxed text-primary-foreground">
-        {code}
-      </pre>
-    </div>
-  )
-}
-
-/** Un site de boulangerie factice, avec la bulle ouverte sur une demande d'avis. */
+/** Un site de boulangerie factice, avec le questionnaire d'avis intégré dans la page. */
 function SiteMock() {
   return (
-    <BrowserFrame url="boulangerie-martin.fr/merci" className="relative">
-      <div className="relative h-[34rem] overflow-hidden bg-[#fbf6ee]" aria-hidden>
-        <div className="bg-[#c98b4a] px-6 py-5 text-white">
+    <BrowserFrame url="boulangerie-martin.fr/merci">
+      <div className="h-[34rem] overflow-hidden bg-[#fbf6ee]" aria-hidden>
+        <div className="bg-[#c98b4a] px-6 py-4 text-white">
           <p className="font-serif text-xl font-semibold">Boulangerie Martin</p>
-          <p className="text-sm opacity-80">Merci pour votre commande !</p>
         </div>
-        <div className="space-y-2 px-6 py-5">
-          <div className="h-3 w-2/3 rounded bg-[#3b2a1a]/15" />
-          <div className="h-3 w-1/2 rounded bg-[#3b2a1a]/10" />
-          <div className="h-3 w-3/5 rounded bg-[#3b2a1a]/10" />
-        </div>
-        <div className="absolute right-4 bottom-16 left-4 overflow-hidden rounded-2xl bg-background shadow-2xl sm:left-auto sm:w-[22rem]">
-          <div className="flex items-center gap-2 border-b px-4 py-2.5 text-sm font-medium">
-            <span className="size-2 rounded-full bg-emerald-500" />
-            Votre avis sur la boulangerie
+        <div className="px-6 pt-5 text-[#3b2a1a]">
+          <p className="font-serif text-lg font-semibold">Merci pour votre commande !</p>
+          <p className="mt-1 text-sm opacity-70">
+            Retrait demain dès 7 h. Laissez-nous votre avis :
+          </p>
+          {/* L'iframe : la page Askly, sans son cadre, posée dans le site. */}
+          <div className="mt-4 overflow-hidden rounded-xl border border-[#3b2a1a]/10 bg-background">
+            <div className="flex items-center gap-2 border-b px-4 py-2.5 text-sm font-medium text-foreground">
+              <span className="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                <ClipboardList className="size-3.5" />
+              </span>
+              Votre avis sur la boulangerie
+            </div>
+            <div className="px-4 pb-4 text-foreground [&>div]:h-72">
+              <ScriptedChat script={SCRIPT} loop />
+            </div>
           </div>
-          <div className="px-4 pb-4 [&_ol]:gap-3 [&>div]:h-80">
-            <ScriptedChat script={SCRIPT} loop />
-          </div>
         </div>
-        <span className="absolute right-4 bottom-4 flex size-10 items-center justify-center rounded-full bg-[#8a4b16] text-white shadow-lg">
-          <X className="size-4" />
-        </span>
       </div>
     </BrowserFrame>
   )

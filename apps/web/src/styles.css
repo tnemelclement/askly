@@ -289,7 +289,7 @@ html.app.dark {
   }
 }
 
-/* Dans une iframe (embed.js) : pas de cadre autour du cadre. Hors @layer pour primer. */
+/* Dans une iframe : pas de cadre autour du cadre. Hors @layer pour primer. */
 html.in-frame .page-frame {
   padding: 0;
   background: var(--background);

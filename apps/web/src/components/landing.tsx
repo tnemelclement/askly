@@ -64,7 +64,7 @@ const FAQ = [
   },
   {
     q: 'Puis-je l’intégrer à mon site ?',
-    a: 'Oui : activez le lien public d’un questionnaire et collez deux lignes de code. Une bulle « Donner mon avis » apparaît en bas de vos pages, ou le questionnaire s’affiche dans la page. Chaque visiteur qui commence compte pour une réponse.',
+    a: 'Oui : activez le lien public d’un questionnaire et collez une ligne de code (une iframe) : le questionnaire s’affiche directement dans votre page. Chaque visiteur qui commence compte pour une réponse.',
   },
   {
     q: 'Puis-je résilier ?',
@@ -168,8 +168,8 @@ export function Landing() {
               l’IA guide votre client étape par étape, et l’aide quand il bloque.
             </UseCard>
             <UseCard icon={Code} title="Sur votre site" to="/integration" cta="Voir comment">
-              Une bulle « Donner mon avis » ou un formulaire dans la page : chaque visiteur répond
-              en conversation, vous recevez des réponses complètes.
+              Le questionnaire directement dans votre page, en une ligne de code : chaque visiteur
+              répond en conversation, vous recevez des réponses complètes.
             </UseCard>
           </div>
         </section>

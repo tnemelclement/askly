@@ -25,7 +25,7 @@ function remembered(publicToken: string) {
 }
 
 /**
- * Lien public d'un questionnaire, ouvert tel quel ou intégré dans un site (embed.js) :
+ * Lien public d'un questionnaire, ouvert tel quel ou intégré dans un site (iframe) :
  * une présentation, puis un répondant neuf au clic sur « Commencer ». Rien n'est créé (ni
  * compté dans le quota) tant que le visiteur ne clique pas. Un visiteur qui revient reprend
  * sa conversation.
