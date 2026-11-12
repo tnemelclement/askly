@@ -1,12 +1,15 @@
 import { Link } from '@tanstack/react-router'
 import {
   ArrowRight,
-  Bot,
+  BookOpen,
+  type Bot,
   Check,
+  Code,
   FileUp,
+  ImagePlus,
   ListChecks,
-  Lock,
   MessagesSquare,
+  Mic,
   PencilLine,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
@@ -14,8 +17,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Comparison, Demo, HERO_SCRIPT, ScriptedChat } from './landing-demo'
 import { ProductReplay } from './product-replay'
-
-const REPO = 'https://github.com/tnemelclement/askly'
+import { SiteFooter, SiteHeader } from './site'
 
 const PLANS = [
   {
@@ -61,6 +63,10 @@ const FAQ = [
     a: 'Chez OVH, en France : base de données et fichiers. Seuls les messages de la conversation passent par l’API d’Anthropic pour générer les réponses de l’assistant. Vous pouvez tout exporter à tout moment.',
   },
   {
+    q: 'Puis-je l’intégrer à mon site ?',
+    a: 'Oui : activez le lien public d’un questionnaire et collez deux lignes de code. Une bulle « Donner mon avis » apparaît en bas de vos pages, ou le questionnaire s’affiche dans la page. Chaque visiteur qui commence compte pour une réponse.',
+  },
+  {
     q: 'Puis-je résilier ?',
     a: 'Oui, à tout moment depuis votre compte, sans engagement. L’abonnement s’arrête à la fin du mois déjà payé.',
   },
@@ -74,25 +80,7 @@ const FAQ = [
 export function Landing() {
   return (
     <div className="min-h-dvh bg-background text-foreground">
-      <header className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-5 sm:px-6">
-        <span className="flex items-center gap-2 font-semibold">
-          <span className="flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            <Bot className="size-4" aria-hidden />
-          </span>
-          Askly
-        </span>
-        <nav className="flex items-center gap-1 sm:gap-2">
-          <Button asChild variant="ghost" className="hidden sm:inline-flex">
-            <a href="#tarifs">Tarifs</a>
-          </Button>
-          <Button asChild variant="ghost" className="hidden sm:inline-flex">
-            <a href={REPO}>GitHub</a>
-          </Button>
-          <Button asChild variant="outline">
-            <a href="/admin/login">Se connecter</a>
-          </Button>
-        </nav>
-      </header>
+      <SiteHeader />
 
       <main>
         <section className="mx-auto grid max-w-6xl items-center gap-12 px-4 pt-10 pb-20 sm:px-6 lg:grid-cols-2 lg:pt-20">
@@ -160,31 +148,67 @@ export function Landing() {
         </section>
 
         <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-          <h2 className="text-3xl font-semibold tracking-tight">Ce qui change pour le répondant</h2>
-          <div className="mt-10 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
-            <Feature icon={MessagesSquare} title="Une question à la fois">
-              Pas de page de vingt champs. L'assistant enchaîne et reformule si la question n'est
-              pas claire.
-            </Feature>
-            <Feature icon={ListChecks} title="Réponses en un clic">
-              Choix, cases à cocher, oui / non, dates et suggestions adaptées : on clique au lieu de
-              taper.
-            </Feature>
-            <Feature icon={PencilLine} title="Tout reste corrigeable">
-              Un panneau montre les réponses retenues. On les relit et on les modifie avant
-              d'envoyer.
-            </Feature>
-            <Feature icon={FileUp} title="Photos et documents">
-              Une question peut demander des fichiers : photos, PDF, devis… jusqu'à 20 Mo chacun.
-            </Feature>
-            <Feature icon={Bot} title="Piloté par Claude">
-              Un serveur MCP expose toute l'administration : créer, envoyer et lire un questionnaire
-              depuis une conversation.
-            </Feature>
-            <Feature icon={Lock} title="Hébergé en France">
-              Base de données et fichiers chez OVH. Le code est ouvert : vous savez exactement ce
-              qu'il fait de vos réponses.
-            </Feature>
+          <h2 className="text-3xl font-semibold tracking-tight">Trois façons de l’utiliser</h2>
+          <p className="mt-3 max-w-2xl text-muted-foreground">
+            Un questionnaire envoyé à vos clients, un tutoriel qui les guide pas à pas, ou un
+            formulaire intégré à votre site. Le tout depuis le même compte.
+          </p>
+          <div className="mt-10 grid gap-6 md:grid-cols-3">
+            <UseCard
+              icon={MessagesSquare}
+              title="Questionnaires"
+              to="/fonctionnalites"
+              cta="Toutes les fonctionnalités"
+            >
+              Un lien par personne. L’IA pose vos questions, les explique et range les réponses. Ou,
+              si vous préférez, un formulaire classique une question par écran, sans IA.
+            </UseCard>
+            <UseCard icon={BookOpen} title="Tutoriels guidés" to="/tutoriels" cta="Découvrir">
+              Configurer un domaine, activer la double authentification, installer un logiciel :
+              l’IA guide votre client étape par étape, et l’aide quand il bloque.
+            </UseCard>
+            <UseCard icon={Code} title="Sur votre site" to="/integration" cta="Voir comment">
+              Une bulle « Donner mon avis » ou un formulaire dans la page : chaque visiteur répond
+              en conversation, vous recevez des réponses complètes.
+            </UseCard>
+          </div>
+        </section>
+
+        <section>
+          <div className="mx-auto max-w-6xl px-4 pt-4 pb-20 sm:px-6">
+            <h2 className="text-3xl font-semibold tracking-tight">
+              Ce qui change pour le répondant
+            </h2>
+            <div className="mt-10 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+              <Feature icon={MessagesSquare} title="Une question à la fois">
+                Pas de page de vingt champs. L'assistant enchaîne et reformule si la question n'est
+                pas claire.
+              </Feature>
+              <Feature icon={ListChecks} title="Réponses en un clic">
+                Choix, cases à cocher, oui / non, dates et suggestions adaptées : on clique au lieu
+                de taper.
+              </Feature>
+              <Feature icon={Mic} title="Répondre à la voix">
+                Un micro dans la barre de réponse : on parle, le texte s’écrit, on relit avant
+                d’envoyer.
+              </Feature>
+              <Feature icon={ImagePlus} title="Photos et captures d’écran">
+                On joint une photo ou une capture, l’IA la regarde et s’en sert pour répondre ou
+                débloquer la situation.
+              </Feature>
+              <Feature icon={PencilLine} title="Tout reste corrigeable">
+                Un panneau montre les réponses retenues. On les relit et on les modifie avant
+                d'envoyer.
+              </Feature>
+              <Feature icon={FileUp} title="Documents joints">
+                Une question peut demander des fichiers : photos, PDF, devis… jusqu'à 20 Mo chacun.
+              </Feature>
+            </div>
+            <Button asChild variant="outline" className="mt-12">
+              <Link to="/fonctionnalites">
+                Toutes les fonctionnalités <ArrowRight data-icon="inline-end" />
+              </Link>
+            </Button>
           </div>
         </section>
 
@@ -268,27 +292,37 @@ export function Landing() {
   )
 }
 
-export function SiteFooter() {
+function UseCard({
+  icon: Icon,
+  title,
+  to,
+  cta,
+  children,
+}: {
+  icon: typeof Bot
+  title: string
+  to: '/fonctionnalites' | '/tutoriels' | '/integration'
+  cta: string
+  children: ReactNode
+}) {
   return (
-    <footer className="border-t">
-      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <span>Askly · logiciel libre sous licence MIT</span>
-        <nav className="flex flex-wrap gap-x-5 gap-y-2">
-          <Link to="/mentions-legales" className="hover:text-foreground">
-            Mentions légales
-          </Link>
-          <Link to="/cgv" className="hover:text-foreground">
-            CGV
-          </Link>
-          <Link to="/confidentialite" className="hover:text-foreground">
-            Confidentialité
-          </Link>
-          <a href={REPO} className="hover:text-foreground">
-            GitHub
-          </a>
-        </nav>
-      </div>
-    </footer>
+    <Link
+      to={to}
+      className="group flex flex-col rounded-xl border bg-background p-6 transition-colors hover:border-foreground"
+    >
+      <span className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+        <Icon className="size-5" aria-hidden />
+      </span>
+      <h3 className="mt-5 text-lg font-semibold">{title}</h3>
+      <p className="mt-2 flex-1 text-muted-foreground">{children}</p>
+      <span className="mt-6 inline-flex items-center gap-1.5 text-sm font-medium">
+        {cta}
+        <ArrowRight
+          className="size-4 transition-transform group-hover:translate-x-0.5"
+          aria-hidden
+        />
+      </span>
+    </Link>
   )
 }
 

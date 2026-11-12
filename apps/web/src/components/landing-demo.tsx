@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 
 /** Mises en situation de la page d'accueil : conversation jouée, et vraie démo à essayer. */
 
-type Line = { ai: string } | { user: string } | { chips: string[] } | { file: string }
+export type Line = { ai: string } | { user: string } | { chips: string[] } | { file: string }
 
 interface Scenario {
   /** Questionnaire `forms/<formId>.yaml` ouvert par « Répondre moi-même ». */

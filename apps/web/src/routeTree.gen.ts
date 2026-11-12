@@ -13,8 +13,11 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as CgvRouteImport } from './routes/cgv'
 import { Route as ConfidentialiteRouteImport } from './routes/confidentialite'
+import { Route as FonctionnalitesRouteImport } from './routes/fonctionnalites'
+import { Route as IntegrationRouteImport } from './routes/integration'
 import { Route as MentionsLegalesRouteImport } from './routes/mentions-legales'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as TutorielsRouteImport } from './routes/tutoriels'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminAccountRouteImport } from './routes/admin.account'
 import { Route as AdminEditRouteImport } from './routes/admin.edit'
@@ -45,6 +48,16 @@ const ConfidentialiteRoute = ConfidentialiteRouteImport.update({
   path: '/confidentialite',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FonctionnalitesRoute = FonctionnalitesRouteImport.update({
+  id: '/fonctionnalites',
+  path: '/fonctionnalites',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IntegrationRoute = IntegrationRouteImport.update({
+  id: '/integration',
+  path: '/integration',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MentionsLegalesRoute = MentionsLegalesRouteImport.update({
   id: '/mentions-legales',
   path: '/mentions-legales',
@@ -53,6 +66,11 @@ const MentionsLegalesRoute = MentionsLegalesRouteImport.update({
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TutorielsRoute = TutorielsRouteImport.update({
+  id: '/tutoriels',
+  path: '/tutoriels',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -107,8 +125,11 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/cgv': typeof CgvRoute
   '/confidentialite': typeof ConfidentialiteRoute
+  '/fonctionnalites': typeof FonctionnalitesRoute
+  '/integration': typeof IntegrationRoute
   '/mentions-legales': typeof MentionsLegalesRoute
   '/signup': typeof SignupRoute
+  '/tutoriels': typeof TutorielsRoute
   '/admin/account': typeof AdminAccountRoute
   '/admin/edit': typeof AdminEditRoute
   '/admin/responses': typeof AdminResponsesRoute
@@ -123,8 +144,11 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/cgv': typeof CgvRoute
   '/confidentialite': typeof ConfidentialiteRoute
+  '/fonctionnalites': typeof FonctionnalitesRoute
+  '/integration': typeof IntegrationRoute
   '/mentions-legales': typeof MentionsLegalesRoute
   '/signup': typeof SignupRoute
+  '/tutoriels': typeof TutorielsRoute
   '/admin/account': typeof AdminAccountRoute
   '/admin/edit': typeof AdminEditRoute
   '/admin/responses': typeof AdminResponsesRoute
@@ -141,8 +165,11 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/cgv': typeof CgvRoute
   '/confidentialite': typeof ConfidentialiteRoute
+  '/fonctionnalites': typeof FonctionnalitesRoute
+  '/integration': typeof IntegrationRoute
   '/mentions-legales': typeof MentionsLegalesRoute
   '/signup': typeof SignupRoute
+  '/tutoriels': typeof TutorielsRoute
   '/admin/account': typeof AdminAccountRoute
   '/admin/edit': typeof AdminEditRoute
   '/admin/responses': typeof AdminResponsesRoute
@@ -160,8 +187,11 @@ export interface FileRouteTypes {
     | '/admin'
     | '/cgv'
     | '/confidentialite'
+    | '/fonctionnalites'
+    | '/integration'
     | '/mentions-legales'
     | '/signup'
+    | '/tutoriels'
     | '/admin/account'
     | '/admin/edit'
     | '/admin/responses'
@@ -176,8 +206,11 @@ export interface FileRouteTypes {
     | '/'
     | '/cgv'
     | '/confidentialite'
+    | '/fonctionnalites'
+    | '/integration'
     | '/mentions-legales'
     | '/signup'
+    | '/tutoriels'
     | '/admin/account'
     | '/admin/edit'
     | '/admin/responses'
@@ -193,8 +226,11 @@ export interface FileRouteTypes {
     | '/admin'
     | '/cgv'
     | '/confidentialite'
+    | '/fonctionnalites'
+    | '/integration'
     | '/mentions-legales'
     | '/signup'
+    | '/tutoriels'
     | '/admin/account'
     | '/admin/edit'
     | '/admin/responses'
@@ -211,8 +247,11 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   CgvRoute: typeof CgvRoute
   ConfidentialiteRoute: typeof ConfidentialiteRoute
+  FonctionnalitesRoute: typeof FonctionnalitesRoute
+  IntegrationRoute: typeof IntegrationRoute
   MentionsLegalesRoute: typeof MentionsLegalesRoute
   SignupRoute: typeof SignupRoute
+  TutorielsRoute: typeof TutorielsRoute
   AdminLoginRoute: typeof AdminLoginRoute
   FPublicTokenRoute: typeof FPublicTokenRoute
   RTokenRoute: typeof RTokenRoute
@@ -248,6 +287,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConfidentialiteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/fonctionnalites': {
+      id: '/fonctionnalites'
+      path: '/fonctionnalites'
+      fullPath: '/fonctionnalites'
+      preLoaderRoute: typeof FonctionnalitesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/integration': {
+      id: '/integration'
+      path: '/integration'
+      fullPath: '/integration'
+      preLoaderRoute: typeof IntegrationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/mentions-legales': {
       id: '/mentions-legales'
       path: '/mentions-legales'
@@ -260,6 +313,13 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tutoriels': {
+      id: '/tutoriels'
+      path: '/tutoriels'
+      fullPath: '/tutoriels'
+      preLoaderRoute: typeof TutorielsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -353,8 +413,11 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   CgvRoute: CgvRoute,
   ConfidentialiteRoute: ConfidentialiteRoute,
+  FonctionnalitesRoute: FonctionnalitesRoute,
+  IntegrationRoute: IntegrationRoute,
   MentionsLegalesRoute: MentionsLegalesRoute,
   SignupRoute: SignupRoute,
+  TutorielsRoute: TutorielsRoute,
   AdminLoginRoute: AdminLoginRoute,
   FPublicTokenRoute: FPublicTokenRoute,
   RTokenRoute: RTokenRoute,

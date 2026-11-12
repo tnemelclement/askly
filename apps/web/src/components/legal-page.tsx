@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { SiteFooter } from '@/components/landing'
+import { SiteFooter } from '@/components/site'
 
 /** Éditeur du service, repris des mentions légales de clementmouly.com. */
 export const EDITOR = {
