@@ -1,5 +1,6 @@
 import { Bot } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { RichText } from '@/lib/rich-text'
 import { cn } from '@/lib/utils'
 import { usePrefersReducedMotion } from './motion'
 import { ZoomableImage } from './zoomable-image'
@@ -35,9 +36,14 @@ export function GuideMessage({ children, className }: { children: ReactNode; cla
       >
         <Bot className="size-4" />
       </div>
-      <div className="min-w-0 flex-1 pt-1 text-[15px] leading-relaxed whitespace-pre-wrap">
+      <div
+        className={cn(
+          'min-w-0 flex-1 pt-1 text-[15px] leading-relaxed',
+          typeof children !== 'string' && 'whitespace-pre-wrap',
+        )}
+      >
         <span className="sr-only">Assistant : </span>
-        {children}
+        {typeof children === 'string' ? <RichText text={children} /> : children}
       </div>
     </li>
   )
