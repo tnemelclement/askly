@@ -2,7 +2,7 @@ import type { Answers, AnswerValue, Form } from '@askly/api/domain'
 import { allQuestions } from '@askly/api/domain'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { ArrowUp, CircleCheck, ImagePlus, X } from 'lucide-react'
+import { ArrowUp, ArrowUpRight, CircleCheck, ImagePlus, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { ClassicForm } from '@/components/classic-form'
@@ -119,6 +119,23 @@ function Submitted({ form }: { form: Form }) {
               </Button>
             </div>
           </>
+        )}
+        {/* Chaque répondant découvre le produit : petite invitation, sans insister. */}
+        {!demo && (
+          <aside className="mt-6 w-full max-w-sm rounded-xl border bg-muted/50 p-4 text-left">
+            <p className="text-sm font-medium">
+              {form.kind === 'tutorial' ? 'Ce tutoriel' : 'Ce questionnaire'} a été fait avec Askly
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Vous aussi, faites remplir vos questionnaires ou guidez vos clients par une
+              conversation, sans les appeler.
+            </p>
+            <Button asChild size="sm" variant="outline" className="mt-3">
+              <a href="/" target="_blank" rel="noreferrer">
+                Essayer Askly <ArrowUpRight />
+              </a>
+            </Button>
+          </aside>
         )}
       </div>
     </div>
