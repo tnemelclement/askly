@@ -18,6 +18,9 @@ declare module '@tanstack/react-router' {
   }
 }
 
+// Intégré dans un site (embed.js) : la page n'a pas besoin de son propre cadre.
+if (window.top !== window.self) document.documentElement.classList.add('in-frame')
+
 // biome-ignore lint/style/noNonNullAssertion: présent dans index.html
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

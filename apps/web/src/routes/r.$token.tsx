@@ -95,7 +95,7 @@ function RespondentPage() {
 function Submitted({ form }: { form: Form }) {
   const demo = form.id.startsWith('demo-')
   return (
-    <div className="h-dvh bg-muted sm:p-6">
+    <div className="page-frame h-dvh bg-muted sm:p-6">
       <div className="mx-auto flex h-full max-w-6xl flex-col overflow-hidden bg-background sm:rounded-xl sm:border sm:shadow-lg">
         <div className="flex flex-1 flex-col items-center justify-center gap-4 overflow-y-auto p-6 text-center">
           <CircleCheck className="size-16 text-primary" aria-hidden />

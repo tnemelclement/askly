@@ -4,6 +4,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   BookOpen,
   ClipboardList,
+  Code,
   Copy,
   Download,
   ExternalLink,
@@ -98,14 +99,17 @@ function FormPage() {
   const query = useQuery({
     queryKey: ['form', formId],
     queryFn: () =>
-      api<{ form: StoredForm; respondents: RespondentRow[] }>(`/api/admin/forms/${formId}`),
+      api<{ form: StoredForm; respondents: RespondentRow[]; publicToken: string | null }>(
+        `/api/admin/forms/${formId}`,
+      ),
   })
   const [tab, setTab] = useState<'people' | 'content'>('people')
   const [inviting, setInviting] = useState(false)
+  const [embedding, setEmbedding] = useState(false)
 
   if (query.isPending) return <p className="text-sm text-muted-foreground">Chargement…</p>
   if (query.isError) return <p className="text-sm text-destructive">{query.error.message}</p>
-  const { form, respondents } = query.data
+  const { form, respondents, publicToken } = query.data
   const tutorial = form.kind === 'tutorial'
   const total = allQuestions(form).length
 
@@ -132,6 +136,9 @@ function FormPage() {
               </Link>
             </Button>
             <ExportMenu formId={formId} />
+            <Button variant="outline" onClick={() => setEmbedding(true)}>
+              <Code /> Intégrer
+            </Button>
             <Button onClick={() => setInviting(true)}>
               <UserPlus /> Inviter
             </Button>
@@ -185,6 +192,12 @@ function FormPage() {
         <Content form={form} />
       )}
 
+      <EmbedDialog
+        form={form}
+        publicToken={publicToken}
+        open={embedding}
+        onOpenChange={setEmbedding}
+      />
       <InviteDialog form={form} open={inviting} onOpenChange={setInviting} />
     </>
   )
@@ -541,6 +554,118 @@ function InviteDialog({
               </Button>
             </DialogFooter>
           </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** Lien public et code à coller dans un site : une bulle « Donner mon avis », ou dans la page. */
+function EmbedDialog({
+  form,
+  publicToken,
+  open,
+  onOpenChange,
+}: {
+  form: StoredForm
+  publicToken: string | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const queryClient = useQueryClient()
+  const [mode, setMode] = useState<'bubble' | 'inline'>('bubble')
+  const toggle = useMutation({
+    mutationFn: (enabled: boolean) =>
+      api(`/api/admin/forms/${form.id}/public`, { body: { enabled } }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['form', form.id] }),
+    onError: (err) => toast.error(err.message),
+  })
+  const origin = window.location.origin
+  const link = publicToken && `${origin}/f/${publicToken}`
+  const label = form.kind === 'tutorial' ? 'Être guidé' : 'Donner mon avis'
+  const snippet =
+    publicToken &&
+    (mode === 'bubble'
+      ? `<script src="${origin}/embed.js" data-askly="${publicToken}" data-label="${label}" async></script>`
+      : `<script src="${origin}/embed.js" data-askly="${publicToken}" data-mode="inline" data-height="640px" async></script>`)
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Intégrer sur votre site</DialogTitle>
+          <DialogDescription>
+            Un lien unique pour tout le monde : chaque visiteur qui clique sur « Commencer » devient
+            une personne dans la liste, avec ses propres réponses. Idéal pour une demande d’avis, un
+            formulaire de contact ou une prise de rendez-vous.
+          </DialogDescription>
+        </DialogHeader>
+        {!link || !snippet ? (
+          <DialogFooter>
+            <Button disabled={toggle.isPending} onClick={() => toggle.mutate(true)}>
+              Activer le lien public
+            </Button>
+          </DialogFooter>
+        ) : (
+          <>
+            <div className="grid gap-2">
+              <Label htmlFor="public-link">Lien public</Label>
+              <div className="flex gap-2">
+                <Input id="public-link" readOnly value={link} className="font-mono text-xs" />
+                <Button variant="outline" onClick={() => copyLink(link)}>
+                  <Copy /> Copier
+                </Button>
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <Label>Code à coller dans votre site</Label>
+                <PillTabs
+                  value={mode}
+                  onChange={setMode}
+                  items={[
+                    { value: 'bubble', label: 'Bulle' },
+                    { value: 'inline', label: 'Dans la page' },
+                  ]}
+                />
+              </div>
+              <pre className="overflow-x-auto rounded-lg border bg-muted p-3 font-mono text-xs whitespace-pre-wrap break-all">
+                {snippet}
+              </pre>
+              <p className="text-xs text-muted-foreground">
+                {mode === 'bubble'
+                  ? 'Avant la fin de </body> : un bouton en bas à droite ouvre le questionnaire. data-label change son texte, data-color sa couleur.'
+                  : 'À l’endroit où le questionnaire doit apparaître. data-height règle sa hauteur.'}{' '}
+                Une réponse n’est comptée que si le visiteur commence.
+              </p>
+            </div>
+            <DialogFooter className="sm:justify-between">
+              <Button
+                variant="ghost"
+                className="text-destructive"
+                disabled={toggle.isPending}
+                onClick={() => toggle.mutate(false)}
+                title="Le lien et le code intégré cessent de fonctionner"
+              >
+                Désactiver
+              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" asChild>
+                  <a href={link} target="_blank" rel="noreferrer">
+                    <ExternalLink /> Ouvrir
+                  </a>
+                </Button>
+                <Button
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(snippet)
+                    toast.success('Code copié')
+                  }}
+                >
+                  <Copy /> Copier le code
+                </Button>
+              </div>
+            </DialogFooter>
+          </>
         )}
       </DialogContent>
     </Dialog>

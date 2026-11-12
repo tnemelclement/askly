@@ -157,7 +157,7 @@ export function ClassicForm({
   const missing = items.filter(({ q }) => q.required && answers[q.id] === undefined)
 
   return (
-    <div className="h-dvh bg-muted sm:p-6">
+    <div className="page-frame h-dvh bg-muted sm:p-6">
       <div className="mx-auto flex h-full max-w-6xl flex-col overflow-hidden bg-background sm:rounded-xl sm:border sm:shadow-lg">
         <header className="shrink-0 border-b">
           <div className="flex items-center gap-2 px-4 py-3 sm:px-6">

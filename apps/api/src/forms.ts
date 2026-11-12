@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -87,4 +88,34 @@ export async function getForm(
     where: and(eq(forms.accountId, accountId), eq(forms.id, id)),
   })
   return row && { ...parseForm(row.id, row.definition), reusable: row.reusable }
+}
+
+/** Jeton du lien public d'un questionnaire, `null` s'il n'est pas activé. */
+export async function getPublicToken(db: Db, accountId: string, id: string) {
+  const row = await db.query.forms.findFirst({
+    columns: { publicToken: true },
+    where: and(eq(forms.accountId, accountId), eq(forms.id, id)),
+  })
+  return row?.publicToken ?? null
+}
+
+/** Active (jeton neuf si besoin) ou coupe le lien public ; le couper invalide les intégrations. */
+export async function setPublicToken(db: Db, accountId: string, id: string, enabled: boolean) {
+  const current = await getPublicToken(db, accountId, id)
+  const next = enabled ? (current ?? randomBytes(12).toString('base64url')) : null
+  await db
+    .update(forms)
+    .set({ publicToken: next })
+    .where(and(eq(forms.accountId, accountId), eq(forms.id, id)))
+  return next
+}
+
+export async function findFormByPublicToken(db: Db, token: string) {
+  const row = await db.query.forms.findFirst({ where: eq(forms.publicToken, token) })
+  return (
+    row && {
+      accountId: row.accountId,
+      form: { ...parseForm(row.id, row.definition), reusable: row.reusable } as StoredForm,
+    }
+  )
 }

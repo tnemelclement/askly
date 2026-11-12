@@ -52,6 +52,8 @@ export const forms = pgTable(
     definition: jsonb().$type<unknown>().notNull(),
     /** `false` = questionnaire ponctuel, écrit pour une seule personne. */
     reusable: boolean().notNull().default(true),
+    /** Lien public (et intégration sur un site) : chaque visiteur devient un répondant. `null` = désactivé. */
+    publicToken: text().unique(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

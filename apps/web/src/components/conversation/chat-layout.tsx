@@ -42,7 +42,7 @@ export function ChatLayout({
 
   return (
     // Fenêtre posée sur un fond (dès la tablette) : un questionnaire, pas une application.
-    <div className={embedded ? 'h-full' : 'h-dvh bg-muted sm:p-6'}>
+    <div className={embedded ? 'h-full' : 'page-frame h-dvh bg-muted sm:p-6'}>
       <div
         className={cn(
           'mx-auto flex h-full max-w-6xl flex-col overflow-hidden bg-background',

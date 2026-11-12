@@ -288,3 +288,14 @@ html.app.dark {
     animation: none;
   }
 }
+
+/* Dans une iframe (embed.js) : pas de cadre autour du cadre. Hors @layer pour primer. */
+html.in-frame .page-frame {
+  padding: 0;
+  background: var(--background);
+}
+html.in-frame .page-frame > div {
+  border-radius: 0;
+  border-width: 0;
+  box-shadow: none;
+}

@@ -68,6 +68,7 @@ import {
   saveFileAnswer,
   type Upload,
 } from './files.ts'
+import { findFormByPublicToken, getPublicToken, setPublicToken } from './forms.ts'
 import { registerMcp } from './mcp.ts'
 import { createLoginLimiter, createSigner, registerOAuth, verifyAccessToken } from './oauth.ts'
 import type { Storage } from './storage.ts'
@@ -463,6 +464,44 @@ export function buildApp({
     return { link: created.link }
   })
 
+  // Lien public d'un questionnaire (aussi intégré dans un site) : présentation, puis un
+  // répondant neuf par visiteur qui clique sur « Commencer ».
+  const publicParams = z.object({ publicToken: z.string().min(8).max(64) })
+  async function publicFormOrThrow(token: string) {
+    const found = await findFormByPublicToken(db, token)
+    if (!found) throw new HttpError(404, 'Ce lien n’est plus actif')
+    return found
+  }
+  app.get('/api/f/:publicToken', async (req) => {
+    const { form } = await publicFormOrThrow(publicParams.parse(req.params).publicToken)
+    return {
+      title: form.title,
+      intro: form.intro,
+      kind: form.kind ?? 'questionnaire',
+      image: form.image,
+    }
+  })
+  const publicLimiter = createLoginLimiter(30, 60 * 60 * 1000)
+  app.post('/api/f/:publicToken/start', async (req) => {
+    const { accountId, form } = await publicFormOrThrow(publicParams.parse(req.params).publicToken)
+    const { page } = z.object({ page: z.string().max(2000).optional() }).parse(req.body ?? {})
+    if (publicLimiter.blocked(req.ip))
+      throw new HttpError(429, 'Trop de tentatives, réessayez plus tard')
+    publicLimiter.fail(req.ip)
+    const account = await getAccount(db, accountId)
+    if (!account) throw new HttpError(404, 'Ce lien n’est plus actif')
+    // Le site d'où vient la personne, pour s'y retrouver dans la liste des réponses.
+    const host = page && URL.canParse(page) ? new URL(page).host : null
+    const created = await createRespondent(
+      db,
+      account,
+      form.id,
+      { name: host ? `Visiteur · ${host}` : 'Visiteur' },
+      origin(req),
+    )
+    return { token: created.token }
+  })
+
   const credentials = z.object({
     email: z.email().max(320),
     password: z.string().min(8, 'Mot de passe : 8 caractères minimum').max(200),
@@ -621,7 +660,15 @@ export function buildApp({
       // Texte YAML de la définition, pour l'éditeur.
       source: stringify(definition, { lineWidth: 100 }),
       respondents: await listRespondents(db, account.id, form, origin(req)),
+      publicToken: await getPublicToken(db, account.id, form.id),
     }
+  })
+
+  app.post('/api/admin/forms/:formId/public', async (req) => {
+    const account = await requireAccount(req)
+    const form = await formOrThrow(db, account.id, formParams.parse(req.params).formId)
+    const { enabled } = z.object({ enabled: z.boolean() }).parse(req.body)
+    return { publicToken: await setPublicToken(db, account.id, form.id, enabled) }
   })
 
   app.put('/api/admin/forms/:formId', async (req) => {

@@ -20,6 +20,7 @@ import { Route as AdminAccountRouteImport } from './routes/admin.account'
 import { Route as AdminEditRouteImport } from './routes/admin.edit'
 import { Route as AdminResponsesRouteImport } from './routes/admin.responses'
 import { Route as AdminLoginRouteImport } from './routes/admin_.login'
+import { Route as FPublicTokenRouteImport } from './routes/f.$publicToken'
 import { Route as RTokenRouteImport } from './routes/r.$token'
 import { Route as AdminFormsFormIdRouteImport } from './routes/admin.forms.$formId'
 import { Route as AdminRespondentsRespondentIdRouteImport } from './routes/admin.respondents.$respondentId'
@@ -79,6 +80,11 @@ const AdminLoginRoute = AdminLoginRouteImport.update({
   path: '/admin/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FPublicTokenRoute = FPublicTokenRouteImport.update({
+  id: '/f/$publicToken',
+  path: '/f/$publicToken',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RTokenRoute = RTokenRouteImport.update({
   id: '/r/$token',
   path: '/r/$token',
@@ -107,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/admin/edit': typeof AdminEditRoute
   '/admin/responses': typeof AdminResponsesRoute
   '/admin/login': typeof AdminLoginRoute
+  '/f/$publicToken': typeof FPublicTokenRoute
   '/r/$token': typeof RTokenRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/forms/$formId': typeof AdminFormsFormIdRoute
@@ -122,6 +129,7 @@ export interface FileRoutesByTo {
   '/admin/edit': typeof AdminEditRoute
   '/admin/responses': typeof AdminResponsesRoute
   '/admin/login': typeof AdminLoginRoute
+  '/f/$publicToken': typeof FPublicTokenRoute
   '/r/$token': typeof RTokenRoute
   '/admin': typeof AdminIndexRoute
   '/admin/forms/$formId': typeof AdminFormsFormIdRoute
@@ -139,6 +147,7 @@ export interface FileRoutesById {
   '/admin/edit': typeof AdminEditRoute
   '/admin/responses': typeof AdminResponsesRoute
   '/admin_/login': typeof AdminLoginRoute
+  '/f/$publicToken': typeof FPublicTokenRoute
   '/r/$token': typeof RTokenRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/forms/$formId': typeof AdminFormsFormIdRoute
@@ -157,6 +166,7 @@ export interface FileRouteTypes {
     | '/admin/edit'
     | '/admin/responses'
     | '/admin/login'
+    | '/f/$publicToken'
     | '/r/$token'
     | '/admin/'
     | '/admin/forms/$formId'
@@ -172,6 +182,7 @@ export interface FileRouteTypes {
     | '/admin/edit'
     | '/admin/responses'
     | '/admin/login'
+    | '/f/$publicToken'
     | '/r/$token'
     | '/admin'
     | '/admin/forms/$formId'
@@ -188,6 +199,7 @@ export interface FileRouteTypes {
     | '/admin/edit'
     | '/admin/responses'
     | '/admin_/login'
+    | '/f/$publicToken'
     | '/r/$token'
     | '/admin/'
     | '/admin/forms/$formId'
@@ -202,6 +214,7 @@ export interface RootRouteChildren {
   MentionsLegalesRoute: typeof MentionsLegalesRoute
   SignupRoute: typeof SignupRoute
   AdminLoginRoute: typeof AdminLoginRoute
+  FPublicTokenRoute: typeof FPublicTokenRoute
   RTokenRoute: typeof RTokenRoute
 }
 
@@ -284,6 +297,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/f/$publicToken': {
+      id: '/f/$publicToken'
+      path: '/f/$publicToken'
+      fullPath: '/f/$publicToken'
+      preLoaderRoute: typeof FPublicTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/r/$token': {
       id: '/r/$token'
       path: '/r/$token'
@@ -336,6 +356,7 @@ const rootRouteChildren: RootRouteChildren = {
   MentionsLegalesRoute: MentionsLegalesRoute,
   SignupRoute: SignupRoute,
   AdminLoginRoute: AdminLoginRoute,
+  FPublicTokenRoute: FPublicTokenRoute,
   RTokenRoute: RTokenRoute,
 }
 export const routeTree = rootRouteImport
