@@ -3,13 +3,13 @@ import { ArrowLeft } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { SiteFooter } from '@/components/site'
 
-/** Éditeur du service, repris des mentions légales de clementmouly.com. */
+/** Éditeur du service : clementmouly.com et l'annuaire des entreprises (SIREN 851 860 874). */
 export const EDITOR = {
   name: 'Clément Mouly',
   status: 'Entrepreneur individuel',
-  // TODO : SIRET, adresse et régime de TVA absents de clementmouly.com, à compléter.
-  siret: 'TODO : SIRET à renseigner',
-  address: 'TODO : adresse à renseigner',
+  siret: '851 860 874 00045',
+  address: '6 rue Chéreau, 75013 Paris, France',
+  vat: 'FR70851860874',
   email: 'mouly.cl@gmail.com',
 }
 

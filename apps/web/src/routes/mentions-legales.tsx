@@ -5,7 +5,7 @@ export const Route = createFileRoute('/mentions-legales')({ component: MentionsL
 
 function MentionsLegales() {
   return (
-    <LegalPage title="Mentions légales" updated="9 novembre 2026">
+    <LegalPage title="Mentions légales" updated="12 novembre 2026">
       <h2>Éditeur</h2>
       <ul>
         <li>
@@ -13,6 +13,7 @@ function MentionsLegales() {
         </li>
         <li>SIRET : {EDITOR.siret}</li>
         <li>Adresse : {EDITOR.address}</li>
+        <li>TVA intracommunautaire : {EDITOR.vat}</li>
         <li>
           Contact : <a href={`mailto:${EDITOR.email}`}>{EDITOR.email}</a>
         </li>

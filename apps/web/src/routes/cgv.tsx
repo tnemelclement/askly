@@ -5,7 +5,7 @@ export const Route = createFileRoute('/cgv')({ component: Cgv })
 
 function Cgv() {
   return (
-    <LegalPage title="Conditions générales de vente et d'utilisation" updated="9 novembre 2026">
+    <LegalPage title="Conditions générales de vente et d'utilisation" updated="12 novembre 2026">
       <h2>1. Objet</h2>
       <p>
         Les présentes conditions régissent l'accès au service hébergé Askly (askly.tnemelc.fr),
@@ -27,8 +27,10 @@ function Cgv() {
         suivant ou jusqu'au passage à une offre supérieure ; les réponses déjà commencées ne sont
         pas affectées.
       </p>
-      {/* TODO : régime de TVA à confirmer (franchise art. 293 B du CGI ou prix TTC). */}
-      <p>Prix en euros. TODO : mention de TVA à confirmer.</p>
+      <p>
+        Prix en euros, toutes taxes comprises (TVA française de 20 % incluse). Numéro de TVA
+        intracommunautaire de l'éditeur : {EDITOR.vat}.
+      </p>
 
       <h2>3. Essai gratuit</h2>
       <p>
@@ -92,7 +94,8 @@ function Cgv() {
       <p>
         Ces conditions sont soumises au droit français. En cas de litige, une solution amiable est
         recherchée d'abord ; un consommateur peut recourir gratuitement à un médiateur de la
-        consommation (TODO : nom du médiateur). À défaut, les tribunaux français sont compétents.
+        consommation (TODO : nom et site du médiateur, une fois l'adhésion faite), après une
+        réclamation écrite restée sans solution. À défaut, les tribunaux français sont compétents.
       </p>
     </LegalPage>
   )

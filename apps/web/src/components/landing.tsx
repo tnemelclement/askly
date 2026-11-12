@@ -256,9 +256,8 @@ export function Landing() {
                 </div>
               ))}
             </div>
-            {/* TODO : régime de TVA à confirmer (franchise art. 293 B du CGI ou prix TTC). */}
             <p className="mt-6 text-sm text-muted-foreground">
-              Paiement mensuel par carte via Stripe. TODO : mention de TVA à confirmer.
+              Prix TTC, TVA de 20 % incluse. Paiement mensuel par carte via Stripe.
             </p>
           </div>
         </section>
