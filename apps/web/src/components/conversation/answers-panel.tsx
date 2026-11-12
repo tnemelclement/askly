@@ -95,6 +95,12 @@ export function AnswersPanel({
   const ready = answeredIds.filter((id) => revealed.has(id)).length
   const missing = missingRequired(form, answers)
   const tutorial = form.kind === 'tutorial'
+  // Étape en cours d'un tutoriel : la première ni faite ni passée.
+  const current = tutorial
+    ? allQuestions(form).find(
+        (q) => q.type === 'step' && answers[q.id] === undefined && !skipped.includes(q.id),
+      )?.id
+    : undefined
 
   return (
     <section aria-label={tutorial ? 'Étapes' : 'Vos réponses'} className="flex h-full flex-col">
@@ -132,27 +138,54 @@ export function AnswersPanel({
                       className={cn(
                         'group flex w-full items-start gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors',
                         'enabled:hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-                        state === 'empty' && 'opacity-70',
+                        state === 'empty' && q.type !== 'step' && 'opacity-70',
+                        q.id === current && 'bg-muted',
                         animate && 'answer-glow',
                       )}
                     >
-                      <AnimatedCheck state={state} animate={animate} className="mt-0.5" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-xs text-muted-foreground">
+                      <AnimatedCheck
+                        state={state}
+                        animate={animate}
+                        className={cn(
+                          'mt-0.5',
+                          q.type === 'step' && 'border-solid border-muted-foreground/40',
+                        )}
+                      />
+                      {q.type === 'step' ? (
+                        // Tutoriel : une liste à cocher, l'étape en cours ressort.
+                        <span
+                          className={cn(
+                            'min-w-0 flex-1 text-sm break-words',
+                            state !== 'empty' && 'text-muted-foreground line-through',
+                            q.id === current && 'font-medium',
+                          )}
+                        >
                           {q.label}
-                          {!q.required && ' (facultatif)'}
-                        </span>
-                        <span className="block text-sm break-words">
-                          {state === 'empty' ? (
-                            <span className="text-muted-foreground">
-                              {skipped.includes(q.id) ? 'Passée' : '—'}
-                            </span>
-                          ) : (
-                            formatAnswer(q, value, names)
+                          {!q.required && (
+                            <span className="text-muted-foreground"> (facultatif)</span>
+                          )}
+                          {skipped.includes(q.id) && (
+                            <span className="text-muted-foreground"> · passée</span>
                           )}
                         </span>
-                      </span>
-                      {!locked && (
+                      ) : (
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-xs text-muted-foreground">
+                            {q.label}
+                            {!q.required && ' (facultatif)'}
+                          </span>
+                          <span className="block text-sm break-words">
+                            {state === 'empty' ? (
+                              <span className="text-muted-foreground">
+                                {skipped.includes(q.id) ? 'Passée' : '—'}
+                              </span>
+                            ) : (
+                              formatAnswer(q, value, names)
+                            )}
+                          </span>
+                        </span>
+                      )}
+                      {!locked && q.type !== 'step' && (
                         <Pencil
                           aria-hidden="true"
                           className="mt-1 size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
