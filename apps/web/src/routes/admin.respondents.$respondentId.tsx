@@ -52,7 +52,7 @@ interface Detail {
   form: Form
   answers: Answers
   files: Record<string, FileInfo>
-  messages: { id: number; role: 'user' | 'assistant'; text: string }[]
+  messages: { id: number; role: 'user' | 'assistant'; text: string; images?: string[] }[]
 }
 
 function RespondentPage() {
@@ -247,7 +247,9 @@ function RespondentPage() {
             <ConversationThread>
               {messages.map((m) =>
                 m.role === 'user' ? (
-                  <UserAnswer key={m.id}>{m.text}</UserAnswer>
+                  <UserAnswer key={m.id} images={m.images}>
+                    {m.text}
+                  </UserAnswer>
                 ) : (
                   <GuideMessage key={m.id}>{m.text}</GuideMessage>
                 ),

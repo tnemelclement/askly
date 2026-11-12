@@ -266,9 +266,11 @@ export async function runTurn(opts: {
   form: Form
   respondent: Respondent
   message: string | null
+  /** Photos ou captures d'écran jointes au message, déjà réduites par le navigateur. */
+  images?: ChatImage[]
   emit: (e: ChatEvent) => void
 }): Promise<void> {
-  const { db, client, form, respondent, message, emit } = opts
+  const { db, client, form, respondent, message, emit, images = [] } = opts
   await markStarted(db, respondent.id)
 
   const names = Object.fromEntries(
@@ -279,12 +281,22 @@ export async function runTurn(opts: {
     {
       role: 'user',
       content: [
+        ...images.map((i) => ({
+          type: 'image' as const,
+          source: { type: 'base64' as const, media_type: i.mediaType, data: i.data },
+        })),
         {
           type: 'text',
-          text: `${state}\n\n${message ? `Message du répondant : ${message}` : form.kind === 'tutorial' ? KICKOFF_TUTORIAL : KICKOFF}`,
+          text: `${state}\n\n${
+            message || images.length
+              ? `Message du répondant : ${message || '(image envoyée, sans texte)'}${images.length ? `\n(${images.length} image${images.length > 1 ? 's' : ''} jointe${images.length > 1 ? 's' : ''} ci-dessus : regardez-la${images.length > 1 ? 's' : ''} pour l'aider)` : ''}`
+              : form.kind === 'tutorial'
+                ? KICKOFF_TUTORIAL
+                : KICKOFF
+          }`,
         },
       ],
-      display: message,
+      display: message ?? (images.length ? '' : null),
     },
   ])
 
@@ -428,8 +440,26 @@ export function nextQuestion(form: Form, answers: Answers): Question | undefined
 }
 
 /** Messages visibles du fil (le reste est technique : état, outils). */
+export type ChatImage = {
+  mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'
+  data: string
+}
+
 export function visibleMessages(rows: Awaited<ReturnType<typeof loadMessages>>) {
   return rows
     .filter((m) => m.display !== null)
-    .map((m) => ({ id: m.id, role: m.role, text: m.display as string }))
+    .map((m) => {
+      // Les images envoyées par le répondant, réaffichées en miniature (data URL).
+      const images = (m.content as Anthropic.ContentBlockParam[])
+        .filter((b): b is Anthropic.ImageBlockParam => b.type === 'image')
+        .flatMap((b) =>
+          b.source.type === 'base64' ? [`data:${b.source.media_type};base64,${b.source.data}`] : [],
+        )
+      return {
+        id: m.id,
+        role: m.role,
+        text: m.display as string,
+        ...(images.length ? { images } : {}),
+      }
+    })
 }

@@ -2,7 +2,7 @@ import type { Answers, AnswerValue, Form } from '@askly/api/domain'
 import { allQuestions } from '@askly/api/domain'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { ArrowUp, CircleCheck } from 'lucide-react'
+import { ArrowUp, CircleCheck, ImagePlus, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { ClassicForm } from '@/components/classic-form'
@@ -28,6 +28,10 @@ import {
   uploadFile,
 } from '@/lib/api'
 import { hasFinePointer } from '@/lib/device'
+import { type StagedImage, shrinkImage } from '@/lib/image'
+
+/** Même plafond que le serveur. */
+const MAX_IMAGES = 4
 
 export const Route = createFileRoute('/r/$token')({ component: RespondentPage })
 
@@ -35,6 +39,7 @@ interface Bubble {
   id: string
   role: 'user' | 'assistant'
   text: string
+  images?: string[]
 }
 
 /** Question en cours, avec ses réponses proposées. */
@@ -49,7 +54,7 @@ interface RespondentData {
   voice: boolean
   answers: Answers
   files: Record<string, FileInfo>
-  messages: { id: number; role: 'user' | 'assistant'; text: string }[]
+  messages: { id: number; role: 'user' | 'assistant'; text: string; images?: string[] }[]
   pending: Pending | null
 }
 
@@ -132,17 +137,30 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
   // Vrai entre le début d'un tour assistant et son premier mot : on montre « écrit… ».
   const [waiting, setWaiting] = useState(false)
   const [draft, setDraft] = useState('')
+  // Images choisies, pas encore envoyées (aperçu au-dessus de la zone de saisie).
+  const [staged, setStaged] = useState<StagedImage[]>([])
+  const imageInput = useRef<HTMLInputElement>(null)
   const [pending, setPending] = useState<Pending | null>(initial.pending)
   const [submitting, setSubmitting] = useState(false)
   const scrollRef = useRef<HTMLElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const kickedOff = useRef(false)
 
-  async function send(message: string | null) {
+  async function send(message: string | null, images: StagedImage[] = []) {
     setPending(null)
     setStreaming(true)
     setWaiting(true)
-    if (message) setBubbles((b) => [...b, { id: `u${Date.now()}`, role: 'user', text: message }])
+    if (message || images.length) {
+      setBubbles((b) => [
+        ...b,
+        {
+          id: `u${Date.now()}`,
+          role: 'user',
+          text: message ?? '',
+          images: images.map((i) => i.preview),
+        },
+      ])
+    }
     // Chaque tour assistant (entre deux appels d'outils) devient sa propre bulle.
     let current: string | null = null
     const onEvent = (e: ChatEvent) => {
@@ -168,7 +186,12 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
       }
     }
     try {
-      await streamChat(token, message, onEvent)
+      await streamChat(
+        token,
+        message,
+        onEvent,
+        images.map(({ mediaType, data }) => ({ mediaType, data })),
+      )
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erreur réseau')
     } finally {
@@ -216,9 +239,11 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
   function onSubmitMessage(e?: React.FormEvent) {
     e?.preventDefault()
     const text = draft.trim()
-    if (!text || streaming || locked) return
+    if ((!text && staged.length === 0) || streaming || locked) return
     setDraft('')
-    void send(text)
+    const images = staged
+    setStaged([])
+    void send(text || null, images)
   }
 
   async function editAnswer(questionId: string, value: AnswerValue) {
@@ -300,8 +325,62 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
       composer={
         <form
           onSubmit={onSubmitMessage}
-          className="flex items-end gap-2 rounded-xl border bg-background p-1.5 pl-2 shadow-soft transition-colors focus-within:border-foreground"
+          className="flex flex-wrap items-end gap-2 rounded-xl border bg-background p-1.5 pl-2 shadow-soft transition-colors focus-within:border-foreground"
         >
+          {staged.length > 0 && (
+            <ul className="flex w-full flex-wrap gap-2 px-1 pt-1" aria-label="Images à envoyer">
+              {staged.map((img, i) => (
+                <li key={img.preview.slice(-32)} className="relative">
+                  <img
+                    src={img.preview}
+                    alt={`Pièce jointe ${i + 1}, pas encore envoyée`}
+                    className="size-16 rounded-lg border object-cover"
+                  />
+                  <button
+                    type="button"
+                    aria-label={`Retirer l'image ${i + 1}`}
+                    onClick={() => setStaged((s) => s.filter((x) => x !== img))}
+                    className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-foreground text-background"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <input
+            ref={imageInput}
+            type="file"
+            accept="image/*"
+            multiple
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden="true"
+            onChange={async (e) => {
+              const list = [...(e.target.files ?? [])]
+              e.target.value = ''
+              const room = MAX_IMAGES - staged.length
+              if (list.length > room) toast.error(`${MAX_IMAGES} images maximum par message`)
+              try {
+                const shrunk = await Promise.all(list.slice(0, room).map(shrinkImage))
+                setStaged((s) => [...s, ...shrunk])
+              } catch {
+                toast.error('Cette image n’a pas pu être lue. Essayez une photo JPEG ou PNG.')
+              }
+            }}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-lg"
+            className="size-10"
+            aria-label="Envoyer une image"
+            title="Envoyer une photo ou une capture d’écran"
+            disabled={streaming || locked || staged.length >= MAX_IMAGES}
+            onClick={() => imageInput.current?.click()}
+          >
+            <ImagePlus />
+          </Button>
           <label htmlFor="message" className="sr-only">
             Votre message
           </label>
@@ -325,7 +404,7 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
               }
             }}
             placeholder="Votre réponse, ou une question…"
-            className="max-h-40 min-h-10 resize-none border-0 bg-transparent px-3 py-2 shadow-none focus-visible:ring-0"
+            className="max-h-40 min-h-10 w-auto min-w-0 flex-1 basis-0 resize-none border-0 bg-transparent px-3 py-2 shadow-none focus-visible:ring-0"
           />
           {initial.voice && (
             <VoiceInput
@@ -341,7 +420,7 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
             type="submit"
             size="icon-lg"
             className="size-10"
-            disabled={streaming || !draft.trim()}
+            disabled={streaming || (!draft.trim() && staged.length === 0)}
             aria-label="Envoyer"
           >
             <ArrowUp />
@@ -360,7 +439,9 @@ function Conversation({ token, initial }: { token: string; initial: RespondentDa
       <ConversationThread>
         {bubbles.map((b) =>
           b.role === 'user' ? (
-            <UserAnswer key={b.id}>{b.text}</UserAnswer>
+            <UserAnswer key={b.id} images={b.images}>
+              {b.text}
+            </UserAnswer>
           ) : (
             <GuideMessage key={b.id}>{b.text}</GuideMessage>
           ),

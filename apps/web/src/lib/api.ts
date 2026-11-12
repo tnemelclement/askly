@@ -31,11 +31,12 @@ export async function streamChat(
   token: string,
   message: string | null,
   onEvent: (e: ChatEvent) => void,
+  images: { mediaType: string; data: string }[] = [],
 ): Promise<void> {
   const res = await fetch(`/api/r/${token}/chat`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, images }),
   })
   if (res.status === 204) return
   if (!res.ok || !res.body) {

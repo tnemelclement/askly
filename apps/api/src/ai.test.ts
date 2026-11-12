@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mergeSuggestions, PRESENT_QUESTION_TOOL, pendingQuestion } from './ai.ts'
+import { mergeSuggestions, PRESENT_QUESTION_TOOL, pendingQuestion, visibleMessages } from './ai.ts'
 import { parseForm } from './forms.ts'
 
 const form = parseForm(
@@ -101,5 +101,25 @@ describe('question en attente (reprise)', () => {
       questionId: 'activite',
       suggestions: ['Artisan', 'Commerce'],
     })
+  })
+})
+
+describe('images du répondant', () => {
+  it('réaffiche les images envoyées en miniature', () => {
+    const rows = [
+      {
+        id: 1,
+        role: 'user',
+        display: '',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: 'AAAA' } },
+          { type: 'text', text: 'état…' },
+        ],
+      },
+      { id: 2, role: 'user', display: null, content: [] },
+    ] as unknown as Parameters<typeof visibleMessages>[0]
+    expect(visibleMessages(rows)).toEqual([
+      { id: 1, role: 'user', text: '', images: ['data:image/jpeg;base64,AAAA'] },
+    ])
   })
 })

@@ -2,6 +2,7 @@ import { Bot } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { usePrefersReducedMotion } from './motion'
+import { ZoomableImage } from './zoomable-image'
 
 /**
  * Briques du fil de conversation :
@@ -42,14 +43,29 @@ export function GuideMessage({ children, className }: { children: ReactNode; cla
   )
 }
 
-export function UserAnswer({ children }: { children: ReactNode }) {
+export function UserAnswer({ children, images }: { children: ReactNode; images?: string[] }) {
   const entry = useEntryClass()
   return (
-    <li className={cn('flex justify-end', entry)} data-message="answer">
-      <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-primary px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap text-primary-foreground">
-        <span className="sr-only">Vous : </span>
-        {children}
-      </div>
+    <li className={cn('flex flex-col items-end gap-1.5', entry)} data-message="answer">
+      {images && images.length > 0 && (
+        <div className="flex max-w-[85%] flex-wrap justify-end gap-1.5">
+          {images.map((src, i) => (
+            <div key={src.slice(-32) + String(i)} className="w-40 sm:w-52">
+              <ZoomableImage
+                src={src}
+                alt={`Image envoyée ${i + 1}`}
+                className="max-h-56 w-full rounded-2xl border object-cover"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+      {children !== '' && (
+        <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-primary px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap text-primary-foreground">
+          <span className="sr-only">Vous : </span>
+          {children}
+        </div>
+      )}
     </li>
   )
 }

@@ -109,6 +109,15 @@ const SESSION_TTL = 60 * 60 * 24 * 30
 const MAX_MESSAGE_LENGTH = 2000
 /** Garde-fou de coût : au-delà, la conversation est manifestement détournée. */
 const MAX_USER_MESSAGES = 150
+const MAX_CHAT_IMAGES = 4
+const chatImageSchema = z.object({
+  mediaType: z.enum(['image/jpeg', 'image/png', 'image/webp', 'image/gif']),
+  // ≈ 2 Mo décodés : le navigateur réduit à 1 568 px avant l'envoi.
+  data: z
+    .string()
+    .max(2_800_000)
+    .regex(/^[A-Za-z0-9+/]+=*$/, 'image en base64 attendue'),
+})
 
 /** E-mail facultatif : le lien peut partir par WhatsApp ; `""` vaut absent. */
 const optionalEmail = z
@@ -255,11 +264,18 @@ export function buildApp({
   // shortcut: verrou en mémoire, valable pour une seule instance de l'API ; passer à un verrou Postgres (pg_advisory_lock) si on en lance plusieurs.
   const busy = new Set<string>()
 
-  app.post('/api/r/:token/chat', async (req, reply) => {
+  // Corps jusqu'à 12 Mo : quatre images réduites par le navigateur (≈ 2 Mo en base64 chacune).
+  app.post('/api/r/:token/chat', { bodyLimit: 12 * 1024 * 1024 }, async (req, reply) => {
     const { respondent, form } = await respondentOrThrow(tokenParams.parse(req.params).token)
-    const { message } = z
-      .object({ message: z.string().trim().min(1).max(MAX_MESSAGE_LENGTH).nullable() })
+    const body = z
+      .object({
+        message: z.string().trim().max(MAX_MESSAGE_LENGTH).nullable(),
+        images: z.array(chatImageSchema).max(MAX_CHAT_IMAGES).default([]),
+      })
       .parse(req.body)
+    const { images } = body
+    // `null` (ou vide sans image) = ouverture de la conversation.
+    const message = body.message || (images.length ? '' : null)
     if (respondent.submittedAt) throw new HttpError(409, 'Réponses déjà envoyées')
     const history = await loadMessages(db, respondent.id)
     // `null` = ouverture de la conversation, une seule fois.
@@ -280,7 +296,7 @@ export function buildApp({
     reply.header('cache-control', 'no-store')
     reply.send(out)
 
-    runTurn({ db, client: anthropic, form, respondent, message, emit })
+    runTurn({ db, client: anthropic, form, respondent, message, images, emit })
       .catch((err) => {
         req.log.error(err)
         emit({

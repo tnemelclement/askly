@@ -6,9 +6,9 @@ const KEY = 'askly-theme'
 function stored(): Theme {
   try {
     const v = localStorage.getItem(KEY)
-    return v === 'light' || v === 'dark' ? v : 'system'
+    return v === 'dark' || v === 'system' ? v : 'light'
   } catch {
-    return 'system'
+    return 'light'
   }
 }
 
